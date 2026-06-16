@@ -48,3 +48,35 @@ def get_bond_features(bond):
   features = bond_type
 
   return features
+
+def smiles_to_graph(smiles):
+  mol = Chem.MolFromSmiles(smiles)
+  if mol is None:
+    return None
+  
+  node_feats = [get_atom_features(atom) for atom in mol.GetAtoms()]
+  x = torch.tensor(node_feats, dtype=torch.float)
+
+  bond_indices = []
+  bond_attrs = []
+
+  for bond in mol.GetBonds():
+    start_idx = bond.GetBeginAtomIdx()
+    end_idx = bond.GetEndAtomIdx()
+
+    attr = get_bond_features(bond)
+
+    bond_indices.append([start_idx, end_idx])
+    bond_indices.append([end_idx, start_idx])
+
+    bond_attrs.append(attr)
+    bond_attrs.append(attr)
+
+  edge_indices = torch.tensor(bond_indices, dtype=torch.float)
+  edge_attrs = torch.tensor(bond_attrs, dtype=torch.float)
+
+  data = Data(x=x, edge_index=edge_indices, edge_attr=edge_attrs)
+
+  return data
+
+  
