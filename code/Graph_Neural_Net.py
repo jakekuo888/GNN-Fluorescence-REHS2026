@@ -18,13 +18,14 @@ chromophore_df = chromophore_df.drop(columns=[header for header in column_header
 
 # https://www.blopig.com/blog/2022/02/how-to-turn-a-smiles-string-into-a-molecular-graph-for-pytorch-geometric/
 
+
 def get_atom_features(atom):
   permitted_atoms = ['C', 'N', 'O', 'S', 'F', 'Cl', 'Br', 'I', 'Se', 'Te', 'Si', 'P', 'B', 'Sn', 'Ge']
   #one-hot everything
   atom_type = [1 if atom.GetSymbol == x else 0 for x in permitted_atoms]
 
   hybridization = [
-      intatom.GetHybridization() == Chem.rdchem.HybridizationType.SP else 0,
+      1 if atom.GetHybridization() == Chem.rdchem.HybridizationType.SP else 0,
       1 if atom.GetHybridization() == Chem.rdchem.HybridizationType.SP2 else 0,
       1 if atom.GetHybridization() == Chem.rdchem.HybridizationType.SP3 else 0
   ]
