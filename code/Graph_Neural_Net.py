@@ -20,10 +20,11 @@ chromophore_df = chromophore_df.drop(columns=[header for header in column_header
 
 def get_atom_features(atom):
   permitted_atoms = ['C', 'N', 'O', 'S', 'F', 'Cl', 'Br', 'I', 'Se', 'Te', 'Si', 'P', 'B', 'Sn', 'Ge']
+  #one-hot everything
   atom_type = [1 if atom.GetSymbol == x else 0 for x in permitted_atoms]
 
   hybridization = [
-      1 if atom.GetHybridization() == Chem.rdchem.HybridizationType.SP else 0,
+      intatom.GetHybridization() == Chem.rdchem.HybridizationType.SP else 0,
       1 if atom.GetHybridization() == Chem.rdchem.HybridizationType.SP2 else 0,
       1 if atom.GetHybridization() == Chem.rdchem.HybridizationType.SP3 else 0
   ]
@@ -38,10 +39,10 @@ def get_atom_features(atom):
 
 def get_bond_features(bond):
   bond_type = [
-      1 if bond.GetBondType() == Chem.rdchem.BondType.SINGLE else 0,
-      1 if bond.GetBondType() == Chem.rdchem.BondType.DOUBLE else 0,
-      1 if bond.GetBondType() == Chem.rdchem.BondType.TRIPLE else 0,
-      1 if bond.GetBondType() == Chem.rdchem.BondType.AROMATIC else 0
+      int(bond.GetBondType() == Chem.rdchem.BondType.SINGLE),
+      int(bond.GetBondType() == Chem.rdchem.BondType.DOUBLE),
+      int(bond.GetBondType() == Chem.rdchem.BondType.TRIPLE),
+      int(bond.GetBondType() == Chem.rdchem.BondType.AROMATIC)
   ]
 
   features = bond_type
@@ -77,5 +78,3 @@ def smiles_to_graph(smiles):
   data = Data(x=x, edge_index=edge_indices, edge_attr=edge_attrs)
 
   return data
-
-  
