@@ -5,22 +5,28 @@ import pandas as pd
 from torch import nn
 
 class NeuralNet(nn.Module):
-  def __init__(self, in_size, out_size, hidden_sizes=[64, 64]):
+  def __init__(self, in_size, out_size, hidden_sizes=None):
     super().__init__()
+
+    if hidden_sizes == None:
+      hidden_sizes = [67, 67]
     
     self.inS = in_size
     self.outS = out_size
     self.hidS = hidden_sizes
-    self.layers = []
+    layers = []
     p_size = self.inS
 
     #set layers
     for h in self.hidS:
-      self.layers.append(nn.Linear(p_size, h))
-      self.layers.append(nn.ReLU())
+      layers.append(nn.Linear(p_size, h))
+      layers.append(nn.ReLU())
       p_size = h
-    self.layers.append(nn.Linear(p_size, self.outS))
-    self.net = nn.Sequential(*self.layers)
+    layers.append(nn.Linear(p_size, self.outS))
+    self.net = nn.Sequential(*layers)
 
   def forward(self, inp):
     return self.net(inp)
+
+mainNN = NeuralNet(10, 1, [20, 20, 20])
+#todo: training & configure data?
