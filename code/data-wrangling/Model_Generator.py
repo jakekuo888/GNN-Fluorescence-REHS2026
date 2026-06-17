@@ -9,13 +9,6 @@ from torch.utils.data import DataLoader
 from rdkit import Chem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 
-# DATA: https://www.nature.com/articles/s41597-020-00634-8
-
-chromophore_df = pd.read_csv('../data/chromophores.csv')
-
-column_headers = chromophore_df.columns.to_list()
-chromophore_df = chromophore_df.drop(columns=[header for header in column_headers if header not in ("Chromophore", "Solvent", "Lifetime (ns)")])
-
 # https://www.blopig.com/blog/2022/02/how-to-turn-a-smiles-string-into-a-molecular-graph-for-pytorch-geometric/
 
 
