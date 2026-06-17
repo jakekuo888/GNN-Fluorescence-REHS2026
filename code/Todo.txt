@@ -1,0 +1,3 @@
+Ideas that we could implement:
+- Make the graph account for the 3D structure of the molecule?
+- Hypergraphs to account for pi bonds and aromaticity
