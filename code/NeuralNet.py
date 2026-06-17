@@ -4,6 +4,8 @@ import pandas as pd
 
 from torch import nn
 
+
+#feed forward aspect of project
 class NeuralNet(nn.Module):
   def __init__(self, in_size, out_size, hidden_sizes=None):
     super().__init__()
