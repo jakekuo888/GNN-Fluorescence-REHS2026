@@ -22,12 +22,12 @@ chromophore_df = chromophore_df.drop(columns=[header for header in column_header
 def get_atom_features(atom):
   permitted_atoms = ['C', 'N', 'O', 'S', 'F', 'Cl', 'Br', 'I', 'Se', 'Te', 'Si', 'P', 'B', 'Sn', 'Ge']
   #one-hot everything
-  atom_type = [1 if atom.GetSymbol == x else 0 for x in permitted_atoms]
+  atom_type = [int(atom.GetSymbol == x) for x in permitted_atoms]
 
   hybridization = [
-      1 if atom.GetHybridization() == Chem.rdchem.HybridizationType.SP else 0,
-      1 if atom.GetHybridization() == Chem.rdchem.HybridizationType.SP2 else 0,
-      1 if atom.GetHybridization() == Chem.rdchem.HybridizationType.SP3 else 0
+      int(atom.GetHybridization() == Chem.rdchem.HybridizationType.SP),
+      int(atom.GetHybridization() == Chem.rdchem.HybridizationType.SP2),
+      int(atom.GetHybridization() == Chem.rdchem.HybridizationType.SP3)
   ]
 
   features = atom_type + hybridization + [
