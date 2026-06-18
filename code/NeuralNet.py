@@ -1,8 +1,17 @@
-import torch
-import numpy as np
 import pandas as pd
+import numpy as np
 
-from torch import nn
+import torch
+import torch.nn as nn
+from torch_geometric.utils import from_smiles
+from torch_geometric.data import Data
+from torch.utils.data import DataLoader
+from torch_geometric.nn import GINEConv, global_add_pool
+
+import torch.nn.functional as F
+
+from rdkit import Chem
+from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 
 
 #feed forward aspect of project
@@ -32,3 +41,36 @@ class NeuralNet(nn.Module):
 
 mainNN = NeuralNet(10, 1, [20, 20, 20])
 #todo: training & configure data?
+
+molecules_list = torch.load('./data-wrangling/lifetime-data/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
+print("Node Features (in_features):", molecules_list[10].num_node_features)
+print("Edge Features (edge_dim):   ", molecules_list[10].num_edge_features)
+
+loader = DataLoader(molecules_list, batch_size=32, shuffle=True) # mini-batching
+
+class GNN(nn.Module):
+  def __init__(self, node_features, edge_features, hidden_layers):
+    super(GNN, self).__init__()
+    torch.manual_seed(12345)
+
+    # vector addition requires same size between the edge and node vectors
+    self.edge_encoder = nn.Linear(edge_features, hidden_layers) # map edge vector to size of hidden layers
+    self.node_encoder = nn.Linear(node_features, hidden_layers) # map node vector to size of hidden layers
+
+    gine_mlp = nn.Sequential(
+      nn.Linear(hidden_layers, hidden_layers),
+      nn.ReLU(),
+      nn.Linear(hidden_layers, hidden_layers)
+    )
+
+    self.conv1 = GINEConv(gine_mlp, eps=0.0, train_eps=True, edge_dim=edge_features)
+
+  def forward(self, x, edge_index, edge_attr, batch):
+    x = self.node_encoder(x)
+    edge_attr = self.edge_encoder(edge_attr)
+
+    x = self.conv1(x, edge_index, edge_attr)
+    x = torch.relu(x)
+
+    graph_readout = global_add_pool(x, batch)
+    return graph_readout
