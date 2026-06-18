@@ -67,16 +67,41 @@ class GNN(nn.Module):
     x = torch.relu(x)
 
     graph_readout = global_add_pool(x, batch)
+  
     return graph_readout
   
 molecules_list = torch.load('./data-wrangling/lifetime-data/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
 loader = DataLoader(molecules_list, batch_size=32, shuffle=True) # mini-batching
-  
-node_features = molecules_list[0].num_node_features
-edge_features = molecules_list[0].num_edge_features
 
 with open('./data-wrangling/lifetime-data/lifetime.txt', 'r') as f:
   fluorescence_times = f.read().splitlines()
-  
+
+y_tensor = torch.tensor(fluorescence_times, dtype=torch.float32)
+for data_obj, label in zip(loader, y_tensor):
+  data_obj.y = label.view(-1, 1)
+
+loader = DataLoader(molecules_list, batch_size=32, shuffle=True) # mini-batching
+
+node_features = molecules_list[0].num_node_features
+edge_features = molecules_list[0].num_edge_features
+
 model = GNN(node_features, edge_features, 64)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+criterion = torch.nn.MSELoss()
+
+def train():
+  model.train()
+
+  for data in loader:
+    out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+    # pred = INSERT MLP/FFNN CODE HERE
+    loss = criterion(out, data.y)
+    loss.backward()
+    optimizer.zero_grad()
+
+def test():
+  model.eval()
+
+  for data in loader:
+    out = model(data.x, data.edge_index, data.edge_attr, data.batch)
+    # pred = INSERT MLP/FFNN CODE HERE
