@@ -14,8 +14,7 @@ from rdkit import Chem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 
 
-#feed forward aspect of project
-class NeuralNet(nn.Module):
+class FFNN(nn.Module):
   def __init__(self, in_size, out_size, hidden_sizes=None):
     super().__init__()
 
@@ -38,9 +37,6 @@ class NeuralNet(nn.Module):
 
   def forward(self, inp):
     return self.net(inp)
-
-mainNN = NeuralNet(10, 1, [20, 20, 20])
-#todo: training & configure data?
 
 class GNN(nn.Module):
   def __init__(self, node_features, edge_features, hidden_channels):
@@ -69,7 +65,21 @@ class GNN(nn.Module):
     graph_readout = global_add_pool(x, batch)
   
     return graph_readout
-  
+
+class Model(nn.Module):
+  def __init__(self, node_features, edge_features, hidden_channels, hidden_sizes):
+    self.gnn = GNN(node_features, edge_features, hidden_channels) 
+    self.ffnn = FFNN(hidden_channels, out_size=1, hidden_sizes)
+
+  def forward(self, x, edge_index, edge_attr, batch):
+    self.gnn.train()
+    readout_vector = self.gnn(x, edge_index, edge_attr, batch)
+
+    self.ffnn.train()
+    fluorescence_time = self.ffnn(readout_vector)
+
+    return fluorescence_time
+
 molecules_list = torch.load('./data-wrangling/lifetime-data/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
 loader = DataLoader(molecules_list, batch_size=32, shuffle=True) # mini-batching
 
