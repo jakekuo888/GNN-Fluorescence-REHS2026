@@ -42,25 +42,19 @@ class NeuralNet(nn.Module):
 mainNN = NeuralNet(10, 1, [20, 20, 20])
 #todo: training & configure data?
 
-molecules_list = torch.load('./data-wrangling/lifetime-data/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
-print("Node Features (in_features):", molecules_list[10].num_node_features)
-print("Edge Features (edge_dim):   ", molecules_list[10].num_edge_features)
-
-loader = DataLoader(molecules_list, batch_size=32, shuffle=True) # mini-batching
-
 class GNN(nn.Module):
-  def __init__(self, node_features, edge_features, hidden_layers):
+  def __init__(self, node_features, edge_features, hidden_channels):
     super(GNN, self).__init__()
     torch.manual_seed(12345)
 
     # vector addition requires same size between the edge and node vectors
-    self.edge_encoder = nn.Linear(edge_features, hidden_layers) # map edge vector to size of hidden layers
-    self.node_encoder = nn.Linear(node_features, hidden_layers) # map node vector to size of hidden layers
+    self.edge_encoder = nn.Linear(edge_features, hidden_channels) # map edge vector to size of hidden layers
+    self.node_encoder = nn.Linear(node_features, hidden_channels) # map node vector to size of hidden layers
 
     gine_mlp = nn.Sequential(
-      nn.Linear(hidden_layers, hidden_layers),
+      nn.Linear(hidden_channels, hidden_channels),
       nn.ReLU(),
-      nn.Linear(hidden_layers, hidden_layers)
+      nn.Linear(hidden_channels, hidden_channels)
     )
 
     self.conv1 = GINEConv(gine_mlp, eps=0.0, train_eps=True, edge_dim=edge_features)
@@ -74,3 +68,15 @@ class GNN(nn.Module):
 
     graph_readout = global_add_pool(x, batch)
     return graph_readout
+  
+molecules_list = torch.load('./data-wrangling/lifetime-data/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
+loader = DataLoader(molecules_list, batch_size=32, shuffle=True) # mini-batching
+  
+node_features = molecules_list[0].num_node_features
+edge_features = molecules_list[0].num_edge_features
+
+with open('./data-wrangling/lifetime-data/lifetime.txt', 'r') as f:
+  fluorescence_times = f.read().splitlines()
+  
+model = GNN(node_features, edge_features, 64)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
