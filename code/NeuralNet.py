@@ -69,7 +69,7 @@ class GNN(nn.Module):
 class Model(nn.Module):
   def __init__(self, node_features, edge_features, hidden_channels, hidden_sizes):
     self.gnn = GNN(node_features, edge_features, hidden_channels) 
-    self.ffnn = FFNN(hidden_channels, out_size=1, hidden_sizes)
+    self.ffnn = FFNN(hidden_channels, 1, hidden_sizes)
 
   def forward(self, x, edge_index, edge_attr, batch):
     self.gnn.train()
@@ -95,7 +95,7 @@ loader = DataLoader(molecules_list, batch_size=32, shuffle=True) # mini-batching
 node_features = molecules_list[0].num_node_features
 edge_features = molecules_list[0].num_edge_features
 
-model = GNN(node_features, edge_features, 64)
+model = Model(node_features, edge_features, 64, [64, 64, 64])
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 criterion = torch.nn.MSELoss()
 
@@ -104,14 +104,31 @@ def train():
 
   for data in loader:
     out = model(data.x, data.edge_index, data.edge_attr, data.batch)
-    # pred = INSERT MLP/FFNN CODE HERE
     loss = criterion(out, data.y)
     loss.backward()
     optimizer.zero_grad()
 
-def test():
+def test(loader):
   model.eval()
+
+  total_mse = 0.0
+  total_graphs = 0
 
   for data in loader:
     out = model(data.x, data.edge_index, data.edge_attr, data.batch)
-    # pred = INSERT MLP/FFNN CODE HERE
+    loss = criterion(out, data.y)
+
+    num_graphs = data.num_graphs
+
+    total_mse += loss * num_graphs
+    total_graphs += num_graphs
+
+  avg_mse = total_mse / total_graphs
+
+  return avg_mse
+
+for epoch in range(1,101):
+  train()
+  test_acc = 0 # implement train split loader
+  train_acc = 0 # implement test split loader
+  print(f"Epoch #{epoch} | Test Accuracy: {test_acc:.4f} | Train Accuracy: {train_acc:.4f}")
