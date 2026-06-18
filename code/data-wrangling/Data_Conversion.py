@@ -1,24 +1,42 @@
 import pandas as pd
-import Model_Generator
+import numpy as np
+import torch
 from Model_Generator import smiles_to_graph
 
-
-# DATA: https://www.nature.com/articles/s41597-020-00634-8
-
 dest_path = "edited_chromophores.csv"
+data_path = "../../data/chromophores.csv"
 
-chromophore_df = pd.read_csv('../../data/chromophores.csv')
-column_headers = chromophore_df.columns.to_list()
-chromophore_df = chromophore_df.drop(columns=[header for header in column_headers if header not in ("Chromophore", "Solvent", "Lifetime (ns)")])
+chromophore_df = pd.read_csv(data_path)
+col_headers = chromophore_df.columns.tolist()
+chromophore_df = chromophore_df.drop(columns=[
+    h for h in col_headers
+    if h not in ("Chromophore", "Solvent", "Lifetime (ns)")
+])
 
-chromophore_df.to_csv(dest_path, index = False)
 
-#molecule
-for smiles in chromophore_df.iloc[:, 0]:
-    nData = smiles_to_graph(smiles)
+m_graphs = []
+s_graphs = []
+v_rows = [] #rows that are valid
 
-#solvent
-for smiles in chromophore_df.iloc[:, 1]:
-    nData = smiles_to_graph(smiles)
+for idx, row in chromophore_df.iterrows():
+    if np.isnan(row["Lifetime (ns)"]):
+        print(f"Lifetime @{idx} is not provided \n SKIPPING")
+        continue
+    mgraph = smiles_to_graph(row["Chromophore"])
+    sgraph = smiles_to_graph(row["Solvent"])
+    if mgraph is None or sgraph is None:
+        print(f"Cannot parse either molecular or solvent smiles @{idx} \n SKIPPING")
+        continue
+    m_graphs.append(mgraph)
+    s_graphs.append(sgraph)
+    v_rows.append(idx)
 
-#print(smiles_to_graph(chromophore_df.iloc[1, 0]))
+lifetimes = chromophore_df.loc[v_rows, "Lifetime (ns)"].tolist()
+
+#export
+with open("Lifetime.txt", "w") as f:
+    for l in lifetimes:
+        print(l, file=f)
+
+torch.save(m_graphs, "molecularGraphs.pt")
+torch.save(s_graphs, "solventGraphs.pt")
