@@ -34,9 +34,9 @@ for idx, row in chromophore_df.iterrows():
 lifetimes = chromophore_df.loc[v_rows, "Lifetime (ns)"].tolist()
 
 #export
-with open("Lifetime.txt", "w") as f:
+with open("lifetime-data/Lifetime.txt", "w") as f:
     for l in lifetimes:
         print(l, file=f)
 
-torch.save(m_graphs, "molecularGraphs.pt")
-torch.save(s_graphs, "solventGraphs.pt")
+torch.save(m_graphs, "lifetime-data/molecularGraphs.pt")
+torch.save(s_graphs, "lifetime-data/solventGraphs.pt")
