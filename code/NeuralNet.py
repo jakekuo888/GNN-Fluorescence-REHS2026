@@ -43,9 +43,9 @@ class GNN(nn.Module):
     super(GNN, self).__init__()
     torch.manual_seed(12345)
 
-    # vector addition requires same size between the edge and node vectors
-    self.edge_encoder = nn.Linear(edge_features, hidden_channels) # map edge vector to size of hidden layers
-    self.node_encoder = nn.Linear(node_features, hidden_channels) # map node vector to size of hidden layers
+    #edge and node vectors should be the same size
+    self.edge_encoder = nn.Linear(edge_features, hidden_channels)
+    self.node_encoder = nn.Linear(node_features, hidden_channels)
 
     gine_mlp = nn.Sequential(
       nn.Linear(hidden_channels, hidden_channels),
@@ -68,6 +68,7 @@ class GNN(nn.Module):
 
 class Model(nn.Module):
   def __init__(self, node_features, edge_features, hidden_channels, hidden_sizes):
+    super().__init__()
     self.gnn = GNN(node_features, edge_features, hidden_channels) 
     self.ffnn = FFNN(hidden_channels, 1, hidden_sizes)
 
