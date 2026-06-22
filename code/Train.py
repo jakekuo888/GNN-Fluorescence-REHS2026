@@ -39,7 +39,7 @@ node_features = molecules_list[0].num_node_features
 edge_features = molecules_list[0].num_edge_features
 
 model = Model(node_features, edge_features, 64, [64, 64, 64])
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 criterion = torch.nn.MSELoss()
 
 def train(loader):
@@ -50,6 +50,7 @@ def train(loader):
     loss = criterion(out, data.y.view(-1, 1))
     optimizer.zero_grad()
     loss.backward()
+    optimizer.step()
 
 def test(loader):
   model.eval()
@@ -70,7 +71,7 @@ def test(loader):
 
   return avg_mse
 
-for epoch in range(1,101):
+for epoch in range(1,1001):
   train(sample_loader)
   sample_avg_mse = test(sample_loader)
   print(f"Epoch #{epoch} | Sample Average MSE: {sample_avg_mse:.4f}")
