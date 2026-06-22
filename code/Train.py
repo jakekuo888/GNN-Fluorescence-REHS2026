@@ -5,17 +5,26 @@ from sklearn.model_selection import train_test_split
 
 from NeuralNet import Model
 
-molecules_list = torch.load('data-wrangling/lifetime-data/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
-loader = DataLoader(molecules_list, batch_size=32, shuffle=True) # mini-batching
+molecules_list = torch.load('./code/data-wrangling/lifetime-data/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
 
-with open('./data-wrangling/lifetime-data/lifetime.txt', 'r') as f:
-  fluorescence_times = f.read().splitlines()
+fluorescence_times = []
+
+with open('./code/data-wrangling/lifetime-data/lifetime.txt', 'r') as f:
+  for line in f:
+    line.strip()
+    fluorescence_times.append(float(line))
 
 y_tensor = torch.tensor(fluorescence_times, dtype=torch.float)
 
+# Z-Score Standardization to fix Large Data Scale
+y_log = torch.log(y_tensor)
+y_mean = y_log.mean()
+y_std = y_log.std()
+y_normalized = (y_log - y_mean) / y_std
+
 processed_dataset = []
 
-for data_obj, label in zip(loader, y_tensor):
+for data_obj, label in zip(molecules_list, y_tensor):
   data_obj.y = label.view(-1, 1)
   processed_dataset.append(data_obj)
 
@@ -38,9 +47,9 @@ def train(loader):
 
   for data in loader:
     out = model(data.x, data.edge_index, data.edge_attr, data.batch)
-    loss = criterion(out, data.y)
-    loss.backward()
+    loss = criterion(out, data.y.view(-1, 1))
     optimizer.zero_grad()
+    loss.backward()
 
 def test(loader):
   model.eval()
@@ -50,7 +59,7 @@ def test(loader):
 
   for data in loader:
     out = model(data.x, data.edge_index, data.edge_attr, data.batch)
-    loss = criterion(out, data.y)
+    loss = criterion(out, data.y.view(-1, 1))
 
     num_graphs = data.num_graphs
 
@@ -63,6 +72,6 @@ def test(loader):
 
 for epoch in range(1,101):
   train(sample_loader)
-  sample_acc = test(sample_loader)
-  print(f"Epoch #{epoch} | Test Accuracy: {sample_acc:.4f}")
+  sample_avg_mse = test(sample_loader)
+  print(f"Epoch #{epoch} | Sample Average MSE: {sample_avg_mse:.4f}")
   #print(f"Epoch #{epoch} | Test Accuracy: {test_acc:.4f} | Train Accuracy: {train_acc:.4f}")

@@ -40,7 +40,6 @@ class FFNN(nn.Module):
 class GNN(nn.Module):
   def __init__(self, node_features, edge_features, hidden_channels):
     super(GNN, self).__init__()
-    torch.manual_seed(12345)
 
     #edge and node vectors should be the same size
     self.edge_encoder = nn.Linear(edge_features, hidden_channels)
@@ -52,13 +51,21 @@ class GNN(nn.Module):
       nn.Linear(hidden_channels, hidden_channels)
     )
 
-    self.conv1 = GINEConv(gine_mlp, eps=0.0, train_eps=True, edge_dim=edge_features)
+    self.conv1 = GINEConv(gine_mlp, eps=0.0, train_eps=True, edge_dim=hidden_channels)
+    self.conv2 = GINEConv(gine_mlp, eps=0.0, train_eps=True, edge_dim=hidden_channels)
+    self.conv3 = GINEConv(gine_mlp, eps=0.0, train_eps=True, edge_dim=hidden_channels)
 
   def forward(self, x, edge_index, edge_attr, batch):
     x = self.node_encoder(x)
     edge_attr = self.edge_encoder(edge_attr)
 
     x = self.conv1(x, edge_index, edge_attr)
+    x = torch.relu(x)
+
+    x = self.conv2(x, edge_index, edge_attr)
+    x = torch.relu(x)
+
+    x = self.conv3(x, edge_index, edge_attr)
     x = torch.relu(x)
 
     graph_readout = global_add_pool(x, batch)
