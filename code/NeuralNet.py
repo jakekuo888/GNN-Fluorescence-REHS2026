@@ -46,15 +46,27 @@ class GNN(nn.Module):
     self.edge_encoder = nn.Linear(edge_features, hidden_channels)
     self.node_encoder = nn.Linear(node_features, hidden_channels)
 
-    gine_mlp = nn.Sequential(
+    gine_mlp1 = nn.Sequential(
       nn.Linear(hidden_channels, hidden_channels),
       nn.ReLU(),
       nn.Linear(hidden_channels, hidden_channels)
     )
 
-    self.conv1 = GINEConv(gine_mlp, eps=0.0, train_eps=True, edge_dim=hidden_channels)
-    self.conv2 = GINEConv(gine_mlp, eps=0.0, train_eps=True, edge_dim=hidden_channels)
-    self.conv3 = GINEConv(gine_mlp, eps=0.0, train_eps=True, edge_dim=hidden_channels)
+    gine_mlp2 = nn.Sequential(
+      nn.Linear(hidden_channels, hidden_channels),
+      nn.ReLU(),
+      nn.Linear(hidden_channels, hidden_channels)
+    )
+
+    gine_mlp3 = nn.Sequential(
+      nn.Linear(hidden_channels, hidden_channels),
+      nn.ReLU(),
+      nn.Linear(hidden_channels, hidden_channels)
+    )
+
+    self.conv1 = GINEConv(gine_mlp1, eps=0.0, train_eps=True, edge_dim=hidden_channels)
+    self.conv2 = GINEConv(gine_mlp2, eps=0.0, train_eps=True, edge_dim=hidden_channels)
+    self.conv3 = GINEConv(gine_mlp3, eps=0.0, train_eps=True, edge_dim=hidden_channels)
 
   def forward(self, x, edge_index, edge_attr, batch):
     x = self.node_encoder(x)
@@ -80,10 +92,7 @@ class Model(nn.Module):
     self.ffnn = FFNN(hidden_channels, 1, hidden_sizes)
 
   def forward(self, x, edge_index, edge_attr, batch):
-    self.gnn.train()
     readout_vector = self.gnn(x, edge_index, edge_attr, batch)
-
-    self.ffnn.train()
     fluorescence_time = self.ffnn(readout_vector)
 
     return fluorescence_time
