@@ -88,11 +88,15 @@ class GNN(nn.Module):
 class Model(nn.Module):
   def __init__(self, node_features, edge_features, hidden_channels, hidden_sizes):
     super().__init__()
-    self.gnn = GNN(node_features, edge_features, hidden_channels) 
-    self.ffnn = FFNN(hidden_channels, 1, hidden_sizes)
+    #Two GNNs, one for Molecules and one for Solvents
+    self.gnn_mol = GNN(node_features, edge_features, hidden_channels) 
+    self.gnn_sol = GNN(node_features, edge_features, hidden_channels)
+    self.ffnn = FFNN(2*hidden_channels, 1, hidden_sizes)
 
-  def forward(self, x, edge_index, edge_attr, batch):
-    readout_vector = self.gnn(x, edge_index, edge_attr, batch)
-    fluorescence_time = self.ffnn(readout_vector)
-
+  def forward(self, xm, mol_edge_index, mol_edge_attr, mol_batch, xs, sol_edge_index, sol_edge_attr, sol_batch):
+    readout_vector_mol = self.gnn_mol(xm, mol_edge_index, mol_edge_attr, mol_batch)
+    readout_vector_sol = self.gnn_sol(xs, sol_edge_index, sol_edge_attr, sol_batch)
+    final_readout = torch.cat([readout_vector_mol, readout_vector_sol], dim=-1)
+    
+    fluorescence_time = self.ffnn(final_readout)
     return fluorescence_time
