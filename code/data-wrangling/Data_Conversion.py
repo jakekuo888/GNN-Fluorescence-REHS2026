@@ -8,35 +8,54 @@ data_path = "../../data/chromophores.csv"
 
 chromophore_df = pd.read_csv(data_path)
 col_headers = chromophore_df.columns.tolist()
+
+predicted_name = "Absorption max (nm)"
+folder = "absorption-data"
+
 chromophore_df = chromophore_df.drop(columns=[
     h for h in col_headers
-    if h not in ("Chromophore", "Solvent", "Lifetime (ns)")
+    if h not in ("Chromophore", "Solvent", predicted_name)
 ])
 
 
 m_graphs = []
 s_graphs = []
-v_rows = [] #rows that are valid
+v_rows = [] #valid_rows
+
+print("Going through data")
 
 for idx, row in chromophore_df.iterrows():
-    if np.isnan(row["Lifetime (ns)"]):
-        print(f"Lifetime @{idx} is not provided \n SKIPPING")
+    if np.isnan(row[predicted_name]):
+        #print(f"Data @{idx} is not provided \n SKIPPING")
         continue
+
+    if row["Solvent"] == "gas":
+        #replace with dummy variable?
+        print(f"SKIP@{idx}: Solvent is labeled as 'gas'")
+        continue
+
     mgraph = smiles_to_graph(row["Chromophore"])
     sgraph = smiles_to_graph(row["Solvent"])
     if mgraph is None or sgraph is None:
-        print(f"Cannot parse either molecular or solvent smiles @{idx} \n SKIPPING")
+        #print(f"Cannot parse either molecular or solvent smiles @{idx} \n SKIPPING")
         continue
     m_graphs.append(mgraph)
     s_graphs.append(sgraph)
     v_rows.append(idx)
 
-lifetimes = chromophore_df.loc[v_rows, "Lifetime (ns)"].tolist()
+Data = chromophore_df.loc[v_rows, predicted_name].tolist()
 
 #export
-with open("lifetime-data/Lifetime.txt", "w") as f:
-    for l in lifetimes:
-        print(l, file=f)
 
-torch.save(m_graphs, "lifetime-data/molecularGraphs.pt")
-torch.save(s_graphs, "lifetime-data/solventGraphs.pt")
+print("Uploading data")
+
+with open(f"{folder}/{predicted_name.split()[0]}.txt", "w") as f:
+    for d in Data:
+        print(d, file=f)
+
+torch.save(m_graphs, f"{folder}/molecularGraphs.pt")
+torch.save(s_graphs, f"{folder}/solventGraphs.pt")
+
+print("Process DONE")
+print(f"Data points collected: {len(Data)}")
+print(f"{predicted_name} txt @ {folder}/{predicted_name.split()[0]}.txt")

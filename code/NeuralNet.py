@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from rdkit import Chem
 from rdkit.Chem.rdmolops import GetAdjacencyMatrix
 
+
 class FFNN(nn.Module):
   def __init__(self, in_size, out_size, hidden_sizes=None):
     super().__init__()
