@@ -5,8 +5,9 @@ from sklearn.model_selection import train_test_split
 
 from neural_networks import Model
 from process_data import molecules_list, solvents_list
-from process_data import y_log, y_std, y_mean
+from process_data import y_std, y_mean
 
+# Split intro 3 datasets: the real training dataset for the supercomputer, and the sample train/test datasets for testing the initial model
 mol_real_train_dataset, mol_split_dataset, sol_real_train_dataset, sol_split_dataset = train_test_split(
     molecules_list, solvents_list, test_size=0.2, random_state=42
 )
@@ -15,6 +16,7 @@ mol_sample_train_dataset, mol_sample_test_dataset, sol_sample_train_dataset, sol
     mol_split_dataset, sol_split_dataset, test_size=0.2, random_state=42
 )
 
+# Data Loaders for each of the three for molecules and solvents
 real_mol_train_loader = DataLoader(mol_real_train_dataset, batch_size=64, shuffle=False)
 sample_mol_train_loader = DataLoader(mol_sample_train_dataset, batch_size=64, shuffle=False)
 sample_mol_test_loader = DataLoader(mol_sample_test_dataset, batch_size=128, shuffle=False)
@@ -22,7 +24,8 @@ sample_mol_test_loader = DataLoader(mol_sample_test_dataset, batch_size=128, shu
 real_sol_train_loader = DataLoader(sol_real_train_dataset, batch_size=64, shuffle=False)
 sample_sol_train_loader = DataLoader(sol_sample_train_dataset, batch_size=64, shuffle=False)
 sample_sol_test_loader = DataLoader(sol_sample_test_dataset, batch_size=128, shuffle=False)
-  
+
+# Set up the Model class (GNN/FFNN), AdamW optimizer, and MSE Loss function
 node_features = molecules_list[0].num_node_features
 edge_features = molecules_list[0].num_edge_features
 
@@ -30,6 +33,7 @@ model = Model(node_features, edge_features, 128, [128, 128, 128])
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
 criterion = torch.nn.MSELoss()
 
+# Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
 def train(mol_loader, sol_loader):
   model.train()
 
@@ -43,6 +47,7 @@ def train(mol_loader, sol_loader):
     loss.backward()
     optimizer.step()
 
+# Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MSE output)
 def test(mol_loader, sol_loader, no_eval=True):
   model.eval()
 
@@ -69,7 +74,7 @@ def test(mol_loader, sol_loader, no_eval=True):
         pred_actual = torch.exp(pred_log)
         pred_actual = pred_actual.flatten()
 
-        # Reverse normalization for target too (this was missing)
+        # Reverse normalization for target too
         target_log = mol_data.y.flatten() * y_std + y_mean
         target_actual = torch.exp(target_log)
 
@@ -83,6 +88,7 @@ def test(mol_loader, sol_loader, no_eval=True):
 
     return avg_mse
 
+# Train & Test the Model
 for epoch in range(1,11):
   train(sample_mol_train_loader, sample_sol_train_loader)
 
