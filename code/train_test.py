@@ -7,6 +7,8 @@ from neural_networks import Model
 from process_data import molecules_list, solvents_list
 from process_data import y_std, y_mean
 
+n_epochs = 300 #easier to change
+
 # Split intro 3 datasets: the real training dataset for the supercomputer, and the sample train/test datasets for testing the initial model
 mol_real_train_dataset, mol_split_dataset, sol_real_train_dataset, sol_split_dataset = train_test_split(
     molecules_list, solvents_list, test_size=0.4, random_state=42
@@ -79,10 +81,13 @@ def test(mol_loader, sol_loader, no_eval=True):
         target_log = mol_data.y.flatten() * y_std + y_mean
         target_actual = torch.exp(target_log)
 
-        for pred, target in zip(pred_actual, target_actual):
-            print(f"Predicted: {pred.item():.4f}")
-            print(f"Actual:    {target.item():.4f}")
-            print("-" * 30)
+        with open("./data/plot-data/pred-act.txt", "w") as f_:
+          for pred, target in zip(pred_actual, target_actual):
+              print(f"Predicted: {pred.item():.4f}")
+              print(f"Actual:    {target.item():.4f}")
+              print("-" * 30)
+              print(f"{pred.item():.4f},{target.item():.4f}", file=f_)
+              #load data so it can be used for plotting
 
   if no_eval:
     avg_mse = total_mse / total_graphs
@@ -90,18 +95,16 @@ def test(mol_loader, sol_loader, no_eval=True):
   return avg_mse
 
 # Train & Test the Model
-for epoch in range(1,101):
-  train(sample_mol_train_loader, sample_sol_train_loader)
+with open("./data/plot-data/MSE.txt", "w") as f_:
+  for epoch in range(1,n_epochs+1):
+    train(sample_mol_train_loader, sample_sol_train_loader)
 
-  train_avg_mse = test(sample_mol_train_loader, sample_sol_train_loader)
-  sample_avg_mse = test(sample_mol_test_loader, sample_sol_test_loader)
-
-  scheduler.step(float(sample_avg_mse))
-
-  print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f}")
-  str = f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f}"
-  with open("MSE.txt", "a") as file:
-    file.write(f"{str}\n")
+    train_avg_mse = test(sample_mol_train_loader, sample_sol_train_loader)
+    sample_avg_mse = test(sample_mol_test_loader, sample_sol_test_loader)
+    scheduler.step(float(sample_avg_mse))
+    
+    print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f}")
+    print(f"{train_avg_mse:.4f}, {sample_avg_mse:.4f}", file=f_) #loading data for plotting (train, test)
 
 print("\nUNDERGOING TESTING\n-----------\n")
 test(sample_mol_test_loader, sample_sol_test_loader, no_eval=False)
