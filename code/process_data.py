@@ -8,6 +8,14 @@ from sklearn.model_selection import train_test_split
 molecules_list = torch.load('./data/lifetime-data/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
 solvents_list = torch.load('./data/lifetime-data/solventGraphs.pt', weights_only=False)
 
+edge_features = molecules_list[0].num_edge_features
+
+for sol in solvents_list:
+    if sol.edge_attr.dim() == 1 and sol.edge_attr.shape[0] == 0:
+        sol.edge_attr = torch.zeros((0, edge_features), dtype=torch.float)
+    if sol.edge_index.dim() == 1 and sol.edge_index.shape[0] == 0:
+        sol.edge_index = torch.zeros((2, 0), dtype=torch.long)
+
 # Fill the y-label list with the fluorescence times
 fluorescence_times = []
 
