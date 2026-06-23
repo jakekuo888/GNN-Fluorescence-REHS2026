@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch_geometric.utils import dropout_edge
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader
-from torch_geometric.nn import GINEConv, global_add_pool
+from torch_geometric.nn import GINEConv, global_add_pool, BatchNorm
 
 import torch.nn.functional as F
 
@@ -72,10 +72,15 @@ class GNN(nn.Module):
     self.conv2 = GINEConv(gine_mlp2, eps=0.0, train_eps=True, edge_dim=hidden_channels)
     self.conv3 = GINEConv(gine_mlp3, eps=0.0, train_eps=True, edge_dim=hidden_channels)
 
+    # Batch Norm to Regularize Training & Combat Overfitting
+    self.bn1 = BatchNorm(hidden_channels)
+    self.bn2 = BatchNorm(hidden_channels)
+    self.bn3 = BatchNorm(hidden_channels)
+
   # Forward function with ReLU activation
   def forward(self, x, edge_index, edge_attr, batch):
     if self.training:
-        edge_index, edge_mask = dropout_edge(edge_index, p=0.2)
+        edge_index, edge_mask = dropout_edge(edge_index, p=0.3)
         edge_attr = edge_attr[edge_mask]
     
     x = self.node_encoder(x)
@@ -83,14 +88,17 @@ class GNN(nn.Module):
 
     x = self.conv1(x, edge_index, edge_attr)
     x = torch.relu(x)
+    x = self.bn1(x)
 
     identity = x
     x = self.conv2(x, edge_index, edge_attr)
     x = torch.relu(x)
     x = x + identity
+    x = self.bn2(x)
 
     x = self.conv3(x, edge_index, edge_attr)
     x = torch.relu(x)
+    x = self.bn3(x)
 
     # Readout function is global_add_pool
     graph_readout = global_add_pool(x, batch)
