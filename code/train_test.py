@@ -95,7 +95,9 @@ def test(mol_loader, sol_loader, no_eval=True):
   if no_eval:
     avg_mse = total_mse / total_graphs
 
-  return avg_mse
+    return avg_mse
+  else:
+    return 0.0
 
 # Train & Test the Model
 with open("./data/plot-data/MSE.txt", "w") as f_:
