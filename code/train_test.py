@@ -9,7 +9,7 @@ from process_data import y_std, y_mean
 
 # Split intro 3 datasets: the real training dataset for the supercomputer, and the sample train/test datasets for testing the initial model
 mol_real_train_dataset, mol_split_dataset, sol_real_train_dataset, sol_split_dataset = train_test_split(
-    molecules_list, solvents_list, test_size=0.2, random_state=42
+    molecules_list, solvents_list, test_size=0.4, random_state=42
 )
 
 mol_sample_train_dataset, mol_sample_test_dataset, sol_sample_train_dataset, sol_sample_test_dataset = train_test_split(
@@ -30,8 +30,9 @@ node_features = molecules_list[0].num_node_features
 edge_features = molecules_list[0].num_edge_features
 
 model = Model(node_features, edge_features, 128, [128, 128, 128])
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 criterion = torch.nn.MSELoss()
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
 # Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
 def train(mol_loader, sol_loader):
@@ -86,16 +87,21 @@ def test(mol_loader, sol_loader, no_eval=True):
   if no_eval:
     avg_mse = total_mse / total_graphs
 
-    return avg_mse
+  return avg_mse
 
 # Train & Test the Model
-for epoch in range(1,11):
+for epoch in range(1,101):
   train(sample_mol_train_loader, sample_sol_train_loader)
 
   train_avg_mse = test(sample_mol_train_loader, sample_sol_train_loader)
   sample_avg_mse = test(sample_mol_test_loader, sample_sol_test_loader)
 
+  scheduler.step(float(sample_avg_mse))
+
   print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f}")
+  str = f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f}"
+  with open("MSE.txt", "a") as file:
+    file.write(f"{str}\n")
 
 print("\nUNDERGOING TESTING\n-----------\n")
 test(sample_mol_test_loader, sample_sol_test_loader, no_eval=False)
