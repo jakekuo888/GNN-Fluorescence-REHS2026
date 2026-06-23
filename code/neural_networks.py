@@ -74,11 +74,12 @@ class GNN(nn.Module):
 
   # Forward function with ReLU activation
   def forward(self, x, edge_index, edge_attr, batch):
+    if self.training:
+        edge_index, edge_mask = dropout_edge(edge_index, p=0.2)
+        edge_attr = edge_attr[edge_mask]
+    
     x = self.node_encoder(x)
     edge_attr = self.edge_encoder(edge_attr)
-
-    if self.training:
-      edge_index, _ = dropout_edge(edge_index, p=0.2)
 
     x = self.conv1(x, edge_index, edge_attr)
     x = torch.relu(x)
