@@ -14,7 +14,7 @@ collect_data = True
 
 # Split intro 3 datasets: the real training dataset for the supercomputer, and the sample train/test datasets for testing the initial model
 mol_real_train_dataset, mol_split_dataset, sol_real_train_dataset, sol_split_dataset = train_test_split(
-    molecules_list, solvents_list, test_size=0.6, random_state=42
+    molecules_list, solvents_list, test_size=0.8, random_state=42
 )
 
 mol_sample_train_dataset, mol_sample_test_dataset, sol_sample_train_dataset, sol_sample_test_dataset = train_test_split(
