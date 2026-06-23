@@ -61,6 +61,7 @@ def test(mol_loader, sol_loader, no_eval=True):
 
   total_mse = 0.0
   total_graphs = 0
+  f_ = open("./data/plot-data/pred-act.txt", "w") if not no_eval else None
 
   with torch.no_grad():
 
@@ -86,14 +87,16 @@ def test(mol_loader, sol_loader, no_eval=True):
         target_log = mol_data.y.flatten() * y_std + y_mean
         target_actual = torch.exp(target_log)
 
-        with open("./data/plot-data/pred-act.txt", "w") as f_:
-          for pred, target in zip(pred_actual, target_actual):
-              print(f"Predicted: {pred.item():.4f}")
-              print(f"Actual:    {target.item():.4f}")
-              print("-" * 30)
-              if(collect_data): print(f"{pred.item():.4f},{target.item():.4f}", file=f_)
-              #load data so it can be used for plotting
+        for pred, target in zip(pred_actual, target_actual):
+          print(f"Predicted: {pred.item():.4f}")
+          print(f"Actual:    {target.item():.4f}")
+          print("-" * 30)
+          if(collect_data): print(f"{pred.item():.4f},{target.item():.4f}", file=f_)
+          #load data so it can be used for plotting
 
+  if f_ is not None:
+    f_.close()
+  
   if no_eval:
     avg_mse = total_mse / total_graphs
 
