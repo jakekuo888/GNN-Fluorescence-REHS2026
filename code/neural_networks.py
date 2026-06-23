@@ -83,7 +83,7 @@ class GNN(nn.Module):
     identity = x
     x = self.conv2(x, edge_index, edge_attr)
     x = torch.relu(x)
-    x += identity
+    x = x + identity
 
     x = self.conv3(x, edge_index, edge_attr)
     x = torch.relu(x)
