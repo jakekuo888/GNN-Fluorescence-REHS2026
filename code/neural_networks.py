@@ -3,7 +3,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-from torch_geometric.utils import from_smiles
+from torch_geometric.utils import dropout_edge
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader
 from torch_geometric.nn import GINEConv, global_add_pool
@@ -76,6 +76,9 @@ class GNN(nn.Module):
   def forward(self, x, edge_index, edge_attr, batch):
     x = self.node_encoder(x)
     edge_attr = self.edge_encoder(edge_attr)
+
+    if self.training:
+      edge_index, _ = dropout_edge(edge_index, p=0.2)
 
     x = self.conv1(x, edge_index, edge_attr)
     x = torch.relu(x)
