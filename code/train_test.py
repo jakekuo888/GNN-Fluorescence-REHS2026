@@ -4,6 +4,8 @@ from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
 
 from neural_networks import Model
+from early_stop import EarlyStop
+
 from process_data import molecules_list, solvents_list
 from process_data import y_std, y_mean
 
@@ -13,22 +15,22 @@ collect_data = True
 #EASY CONTROLS ^^^
 
 # Split intro 3 datasets: the real training dataset for the supercomputer, and the sample train/test datasets for testing the initial model
-mol_train_dataset, mol_split_dataset, sol_train_dataset, sol_split_dataset = train_test_split(
+mol_real_train_dataset, mol_split_dataset, sol_real_train_dataset, sol_split_dataset = train_test_split(
     molecules_list, solvents_list, test_size=0.2, random_state=42
 )
 
-mol__validation_dataset, mol_test_dataset, sol_validation_dataset, sol_test_dataset = train_test_split(
-    mol_split_dataset, sol_split_dataset, test_size=0.5, random_state=42
+mol_sample_train_dataset, mol_sample_test_dataset, sol_sample_train_dataset, sol_sample_test_dataset = train_test_split(
+    mol_split_dataset, sol_split_dataset, test_size=0.2, random_state=42
 )
 
 # Data Loaders for each of the three for molecules and solvents
-mol_train_loader = DataLoader(mol_train_dataset, batch_size=64, shuffle=False)
-mol_validation_loader = DataLoader(mol__validation_dataset, batch_size=128, shuffle=False)
-mol_test_loader = DataLoader(mol_test_dataset, batch_size=128, shuffle=False)
+real_mol_train_loader = DataLoader(mol_real_train_dataset, batch_size=64, shuffle=False)
+sample_mol_train_loader = DataLoader(mol_sample_train_dataset, batch_size=64, shuffle=False)
+sample_mol_test_loader = DataLoader(mol_sample_test_dataset, batch_size=128, shuffle=False)
 
-sol_train_loader = DataLoader(sol_train_dataset, batch_size=64, shuffle=False)
-sol_validation_loader = DataLoader(sol_validation_dataset, batch_size=128, shuffle=False)
-sol_test_loader = DataLoader(sol_test_dataset, batch_size=128, shuffle=False)
+real_sol_train_loader = DataLoader(sol_real_train_dataset, batch_size=64, shuffle=False)
+sample_sol_train_loader = DataLoader(sol_sample_train_dataset, batch_size=64, shuffle=False)
+sample_sol_test_loader = DataLoader(sol_sample_test_dataset, batch_size=128, shuffle=False)
 
 # Set up the Model class (GNN/FFNN), AdamW optimizer, and MSE Loss function
 node_features = molecules_list[0].num_node_features
@@ -54,7 +56,7 @@ def train(mol_loader, sol_loader):
     optimizer.step()
 
 # Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MSE output)
-def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
+def test(mol_loader, sol_loader, no_eval=True):
   model.eval()
 
   total_mse = 0.0
@@ -74,7 +76,7 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
 
         total_mse += loss * num_graphs
         total_graphs += num_graphs
-      if print_diff:
+      else:
         # Reverse normalization for prediction
         pred_log = out.squeeze() * y_std + y_mean
         pred_actual = torch.exp(pred_log)
@@ -99,18 +101,23 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
   else:
     return 0.0
 
+early_stopper = EarlyStop(15, 0.0005)
+
 # Train & Test the Model
 with open("./data/plot-data/MSE.txt", "w") as f_:
   for epoch in range(1,n_epochs+1):
-    train(mol_train_loader, sol_train_loader)
+    train(sample_mol_train_loader, sample_sol_train_loader)
 
-    train_avg_mse = test(mol_train_loader, sol_train_loader)
-    sample_avg_mse = test(mol_validation_loader, sol_validation_loader)
+    train_avg_mse = test(sample_mol_train_loader, sample_sol_train_loader)
+    sample_avg_mse = test(sample_mol_test_loader, sample_sol_test_loader)
     scheduler.step(float(sample_avg_mse))
 
-    print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f}")
+    if early_stopper.stop_early(sample_avg_mse):
+      print(f'Early stop has been initiated on Epoch #{epoch}')
+      break
+
+    print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f} | Early stopper count: {early_stopper.count}")
     if(collect_data): print(f"{train_avg_mse:.4f}, {sample_avg_mse:.4f}", file=f_) #loading data for plotting (train, test)
 
 print("\nUNDERGOING TESTING\n-----------\n")
-test_avg_mse = test(mol_test_loader, sol_test_loader, no_eval=True, print_diff=True)
-print(f"FINAL TEST AVERAGE MSE: {test_avg_mse}")
+test(sample_mol_test_loader, sample_sol_test_loader, no_eval=False)
