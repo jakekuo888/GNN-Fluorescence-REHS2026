@@ -35,8 +35,9 @@ node_features = molecules_list[0].num_node_features
 edge_features = molecules_list[0].num_edge_features
 
 model = Model(node_features, edge_features, 128, [128, 128, 128])
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.001)
 criterion = torch.nn.MSELoss()
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
 # Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
 def train(mol_loader, sol_loader):
@@ -94,7 +95,7 @@ def test(mol_loader, sol_loader, no_eval=True):
   if no_eval:
     avg_mse = total_mse / total_graphs
 
-    return avg_mse
+  return avg_mse
 
 # Train & Test the Model
 with open("./data/plot-data/MSE.txt", "w") as f_:
@@ -103,7 +104,8 @@ with open("./data/plot-data/MSE.txt", "w") as f_:
 
     train_avg_mse = test(sample_mol_train_loader, sample_sol_train_loader)
     sample_avg_mse = test(sample_mol_test_loader, sample_sol_test_loader)
-
+    scheduler.step(float(sample_avg_mse))
+    
     print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f}")
     if(collect_data): print(f"{train_avg_mse:.4f}, {sample_avg_mse:.4f}", file=f_) #loading data for plotting (train, test)
 
