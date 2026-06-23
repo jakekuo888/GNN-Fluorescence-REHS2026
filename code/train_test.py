@@ -104,7 +104,7 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
   else:
     return 0.0
 
-early_stopper = EarlyStop(15, 0.0005)
+early_stopper = EarlyStop(9, 0.0005)
 
 # Train & Test the Model
 with open("./data/plot-data/MSE.txt", "w") as f_:
