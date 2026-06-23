@@ -8,7 +8,7 @@ from process_data import molecules_list, solvents_list
 from process_data import y_std, y_mean
 
 #EASY CONTROLS vvv
-n_epochs = 300
+n_epochs = 100
 collect_data = True
 #EASY CONTROLS ^^^
 
@@ -107,7 +107,7 @@ with open("./data/plot-data/MSE.txt", "w") as f_:
     train_avg_mse = test(sample_mol_train_loader, sample_sol_train_loader)
     sample_avg_mse = test(sample_mol_test_loader, sample_sol_test_loader)
     scheduler.step(float(sample_avg_mse))
-    
+
     print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f}")
     if(collect_data): print(f"{train_avg_mse:.4f}, {sample_avg_mse:.4f}", file=f_) #loading data for plotting (train, test)
 
