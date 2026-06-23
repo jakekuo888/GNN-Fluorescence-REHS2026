@@ -3,6 +3,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+from torch.nn import MultiheadAttention
 from torch_geometric.utils import dropout_edge
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader
@@ -90,10 +91,8 @@ class GNN(nn.Module):
     x = torch.relu(x)
     x = self.bn1(x)
 
-    identity = x
     x = self.conv2(x, edge_index, edge_attr)
     x = torch.relu(x)
-    x = x + identity
     x = self.bn2(x)
 
     x = self.conv3(x, edge_index, edge_attr)
@@ -113,6 +112,9 @@ class Model(nn.Module):
     self.gnn_mol = GNN(node_features, edge_features, hidden_channels) 
     self.gnn_sol = GNN(node_features, edge_features, hidden_channels)
 
+    self.cross_attn1 = nn.MultiheadAttention(hidden_channels, num_heads=4, batch_first=True)
+    self.cross_attn2 = nn.MultiheadAttention(hidden_channels, num_heads=4, batch_first=True)
+
     self.ffnn = FFNN(2*hidden_channels, 1, hidden_sizes)
 
   def forward(self, xm, mol_edge_index, mol_edge_attr, mol_batch, xs, sol_edge_index, sol_edge_attr, sol_batch):
@@ -120,7 +122,18 @@ class Model(nn.Module):
     readout_vector_mol = self.gnn_mol(xm, mol_edge_index, mol_edge_attr, mol_batch)
     readout_vector_sol = self.gnn_sol(xs, sol_edge_index, sol_edge_attr, sol_batch)
 
-    final_readout = torch.cat([readout_vector_mol, readout_vector_sol], dim=-1)
+    mol_q = readout_vector_mol.unsqueeze(1)
+    sol_q = readout_vector_sol.unsqueeze(1)
+
+    # mol attends to sol
+    mol_attn, _ = self.cross_attn1(mol_q, sol_q, sol_q)
+    mol_out = readout_vector_mol + mol_attn.squeeze(1)
+
+    # sol attends to mol
+    sol_attn, _ = self.cross_attn2(sol_q, mol_q, mol_q)
+    sol_out = readout_vector_sol + sol_attn.squeeze(1)
+
+    final_readout = torch.cat([mol_out, sol_out], dim=-1)
     
     fluorescence_time = self.ffnn(final_readout)
 
