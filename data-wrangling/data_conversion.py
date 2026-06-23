@@ -1,10 +1,13 @@
 import pandas as pd
 import numpy as np
 import torch
-from Model_Generator import smiles_to_graph
+from model_generator import smiles_to_graph
+
+import os
+print("Current folder:", os.getcwd())
 
 dest_path = "edited_chromophores.csv"
-data_path = "../../data/chromophores.csv"
+data_path = "./data/chromophores.csv"
 
 chromophore_df = pd.read_csv(data_path)
 col_headers = chromophore_df.columns.tolist()
