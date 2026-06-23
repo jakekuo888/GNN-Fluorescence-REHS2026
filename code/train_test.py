@@ -37,7 +37,7 @@ node_features = molecules_list[0].num_node_features
 edge_features = molecules_list[0].num_edge_features
 
 model = Model(node_features, edge_features, 128, [128, 128, 128])
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=2.5e-4)
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
 criterion = torch.nn.MSELoss()
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
