@@ -12,8 +12,8 @@ data_path = "./data/chromophores.csv"
 chromophore_df = pd.read_csv(data_path)
 col_headers = chromophore_df.columns.tolist()
 
-predicted_name = "Lifetime (ns)"
-folder = "lifetime-data"
+predicted_name = "Absorption max (nm)"
+folder = "absorption-data"
 
 chromophore_df = chromophore_df.drop(columns=[
     h for h in col_headers
