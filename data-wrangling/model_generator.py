@@ -1,11 +1,12 @@
 import torch
 from torch_geometric.data import Data
 from rdkit import Chem
+from rdkit.Chem import rdPartialCharges
 
 #https://www.blopig.com/blog/2022/02/how-to-turn-a-smiles-string-into-a-molecular-graph-for-pytorch-geometric/
 
 
-def get_atom_features(atom):
+def get_atom_features(atom, mol):
   permitted_atoms = ['C', 'N', 'O', 'S', 'F', 'Cl', 'Br', 'I', 'Se', 'Te', 'Si', 'P', 'B', 'Sn', 'Ge']
   #one-hot everything
   atom_type = [int(atom.GetSymbol() == x) for x in permitted_atoms]
@@ -17,10 +18,24 @@ def get_atom_features(atom):
       int(atomH == Chem.rdchem.HybridizationType.SP3)
   ]
 
-  features = atom_type + hybridization + [
+  rdPartialCharges.ComputeGasteigerCharges(mol)
+  charge = float(atom.GetDoubleProp('_GasteigerCharge'))
+
+  chirality_options = [
+    Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
+    Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
+    Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW,
+    Chem.rdchem.ChiralType.CHI_OTHER
+  ]
+  chirality = [int(atom.GetChiralTag() == c) for c in chirality_options]
+
+  features = atom_type + hybridization + chirality_options + [
         atom.GetDegree(),
         atom.GetFormalCharge(),
-        int(atom.GetIsAromatic())
+        atom.GetTotalNumHs(),
+        int(atom.GetIsAromatic()),
+        int(atom.IsInRing()),
+        charge
   ]
 
   return features
@@ -35,7 +50,10 @@ def get_bond_features(bond):
       int(bondGBT == Chem.rdchem.BondType.AROMATIC)
   ]
 
-  features = bond_type
+  features = bond_type + [
+      int(bond.IsInRing()),
+      int(bond.GetIsConjugated())
+  ]
 
   return features
 
@@ -45,7 +63,7 @@ def smiles_to_graph(smiles):
     print(f"ERR: {smiles} could not be parsed")
     return None
   
-  node_feats = [get_atom_features(atom) for atom in mol.GetAtoms()]
+  node_feats = [get_atom_features(atom, mol) for atom in mol.GetAtoms()]
   x = torch.tensor(node_feats, dtype=torch.float)
 
   bond_indices = []

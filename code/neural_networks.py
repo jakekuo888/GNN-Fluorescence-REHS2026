@@ -3,7 +3,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-from torch.nn import MultiheadAttention
 from torch_geometric.utils import dropout_edge
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader

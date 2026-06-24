@@ -52,12 +52,12 @@ Data = chromophore_df.loc[v_rows, predicted_name].tolist()
 
 print("Uploading data")
 
+torch.save(m_graphs, f"{folder}/molecularGraphs.pt")
+torch.save(s_graphs, f"{folder}/solventGraphs.pt")
+
 with open(f"{folder}/{predicted_name.split()[0]}.txt", "w") as f:
     for d in Data:
         print(d, file=f)
-
-torch.save(m_graphs, f"{folder}/molecularGraphs.pt")
-torch.save(s_graphs, f"{folder}/solventGraphs.pt")
 
 print("Process DONE")
 print(f"Data points collected: {len(Data)}")
