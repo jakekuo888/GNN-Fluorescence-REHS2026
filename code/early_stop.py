@@ -1,5 +1,3 @@
-import torch
-import torch.nn as nn
 import copy
 
 
@@ -9,15 +7,19 @@ class EarlyStop:
 		self.m_delta = m_delta
 		self.count = 0
 		self.best_mse = float('inf')
-		#NOTE: have it copy the weights when early stop.
-		#This is incomplete.
+		self.best_model = None
 
-	def stop_early(self, validation_mse):
+	def stop_early(self, validation_mse, model):
 		if validation_mse < self.best_mse - self.m_delta:
 			self.best_mse = validation_mse
 			self.count = 0
+			self.best_model = copy.deepcopy(model.state_dict())
 		else:
 			self.count += 1
 			if self.count > self.patience:
 				return True
 		return False
+
+	def restore_best(self, model):
+		if self.best_model is not None:
+			model.load_state_dict(self.best_model)
