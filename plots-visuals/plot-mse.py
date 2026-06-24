@@ -20,4 +20,4 @@ plt.title(f'MSE vs Epoch ({len(train_MSE)})')
 plt.xlabel('Epoch')
 plt.ylabel('MSE')
 
-plt.savefig('./Plots-Visuals/Visuals/MSE.png')
+plt.savefig('./plots-visuals/new-plots/MSE.png')
