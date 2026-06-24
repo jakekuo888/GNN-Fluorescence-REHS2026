@@ -2,6 +2,7 @@ import torch
 from torch_geometric.data import Data
 from rdkit import Chem
 from rdkit.Chem import rdPartialCharges
+import numpy as np
 
 #https://www.blopig.com/blog/2022/02/how-to-turn-a-smiles-string-into-a-molecular-graph-for-pytorch-geometric/
 
@@ -18,8 +19,9 @@ def get_atom_features(atom, mol):
       int(atomH == Chem.rdchem.HybridizationType.SP3)
   ]
 
-  rdPartialCharges.ComputeGasteigerCharges(mol)
   charge = float(atom.GetDoubleProp('_GasteigerCharge'))
+  if not np.isfinite(charge):
+      charge = 0.0
 
   chirality_options = [
     Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
@@ -32,7 +34,6 @@ def get_atom_features(atom, mol):
   features = atom_type + hybridization + chirality + [
         atom.GetDegree(),
         atom.GetFormalCharge(),
-        atom.GetTotalNumHs(),
         int(atom.GetIsAromatic()),
         int(atom.IsInRing()),
         charge
@@ -60,6 +61,8 @@ def get_bond_features(bond):
 def smiles_to_graph(smiles):
   mol = Chem.MolFromSmiles(smiles)
   mol = Chem.AddHs(mol)
+
+  rdPartialCharges.ComputeGasteigerCharges(mol)
   
   if mol is None:
     print(f"ERR: {smiles} could not be parsed")
