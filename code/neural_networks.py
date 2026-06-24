@@ -31,6 +31,7 @@ class FFNN(nn.Module):
     #set layers
     for h in self.hidS:
       layers.append(nn.Linear(p_size, h))
+      layers.append(BatchNorm(h)) # add batch norm to FFNN
       layers.append(nn.ReLU())
       p_size = h
     layers.append(nn.Linear(p_size, self.outS))
