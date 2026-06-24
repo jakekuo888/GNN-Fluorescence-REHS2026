@@ -52,7 +52,7 @@ Data = chromophore_df.loc[v_rows, predicted_name].tolist()
 
 print("Uploading data")
 
-with open(f"./data/{folder}/{predicted_name.split()[0]}.txt", "w") as f:
+with open(f"./data/{folder}/{predicted_name.split()[0].lower()}.txt", "w") as f:
     for d in Data:
         print(d, file=f)
 
