@@ -73,7 +73,17 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
         mol_data.x, mol_data.edge_index, mol_data.edge_attr, mol_data.batch,
         sol_data.x, sol_data.edge_index, sol_data.edge_attr, sol_data.batch
       )
-      loss = criterion(out, mol_data.y.view(-1,1))
+      
+      # Reverse normalization for prediction
+      pred_log = out.squeeze() * y_std + y_mean
+      pred_actual = torch.exp(pred_log)
+      pred_actual = pred_actual.flatten()
+
+      # Reverse normalization for target too
+      target_log = mol_data.y.flatten() * y_std + y_mean
+      target_actual = torch.exp(target_log)
+
+      loss = criterion(pred_actual, target_actual)
 
       if no_eval:
         num_graphs = mol_data.num_graphs
