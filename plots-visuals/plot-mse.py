@@ -16,8 +16,8 @@ with open("./data/plot-data/MSE.txt", "r") as MSE:
 plt.plot(train_MSE, color = 'blue', linestyle = '-', label = 'train')
 plt.plot(test_MSE, color = 'red', linestyle = '--', label = 'test')
 plt.legend()
-plt.title(f'MSE vs Epoch ({len(train_MSE)})')
+plt.title(f'Absorption MAE (nm) vs Epoch ({len(train_MSE)})')
 plt.xlabel('Epoch')
-plt.ylabel('MSE')
+plt.ylabel('Absorption MAE (nm)')
 
-plt.savefig('./plots-visuals/new-plots/MSE.png')
+plt.savefig('./plots-visuals/new-plots/NM-Difference.png')

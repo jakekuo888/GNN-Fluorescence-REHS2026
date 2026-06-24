@@ -83,7 +83,7 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
       target_log = mol_data.y.flatten() * y_std + y_mean
       target_actual = torch.exp(target_log)
 
-      loss = criterion(pred_actual, target_actual)
+      loss = torch.mean(torch.abs(pred_actual - target_actual))
 
       if no_eval:
         num_graphs = mol_data.num_graphs
@@ -131,15 +131,15 @@ with open("./data/plot-data/MSE.txt", "w") as f_:
       early_stopper.restore_best(model)
       break
 
-    print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f} | Early stopper count: {early_stopper.count}")
+    print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mse:.4f} | Test Average MAE: {sample_avg_mse:.4f} | Early stopper count: {early_stopper.count}")
     if(collect_data): print(f"{train_avg_mse:.4f}, {sample_avg_mse:.4f}", file=f_) #loading data for plotting (train, test)
 
 print("\nUNDERGOING TESTING\n-----------\n")
 test_avg_mse = test(mol_test_loader, sol_test_loader, no_eval=True, print_diff=True)
-print(f"\n------------------------------\nTEST AVERAGE MSE (FINAL RESULTS): {test_avg_mse}\n------------------------------")
+print(f"\n------------------------------\nTEST AVERAGE MAE (FINAL RESULTS): {test_avg_mse}\n------------------------------")
 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
   if(want_visuals == 'y'):
-    subprocess.run([sys.executable, "./Plots-Visuals/Plots.py"])
+    subprocess.run([sys.executable, "./plots-visuals/plot-mse.py"])
     print("Visuals sucessfully created!\n Check Plots-Visuals/Visuals.")
