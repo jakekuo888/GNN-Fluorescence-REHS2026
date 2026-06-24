@@ -11,11 +11,6 @@ from early_stop import EarlyStop
 from process_data import molecules_list, solvents_list
 from process_data import y_std, y_mean
 
-prediction_options = ["Absorption max (nm)", "Lifetime (ns)"]
-data_to_predict = prediction_options[0] # change to one for lifetime prediction
-
-
-
 #EASY CONTROLS vvv
 n_epochs = 100
 collect_data = True

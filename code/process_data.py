@@ -4,9 +4,27 @@ from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
 
+import os
+import sys
+
+# Finds the root directory (one level up from main_script.py)
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(os.path.join(root_dir, 'data-wrangling'))
+
+from data_conversion import generate_and_export_data
+
+prediction_options = ["Absorption max (nm)", "Lifetime (ns)"]
+prediction_folders = ["absorption-data", "lifetime-data"]
+prediction_files = ["absorption.txt", "lifetime.txt"]
+
+option = 0
+re_generate_data = False
+if re_generate_data:
+   generate_and_export_data(prediction_options[option], prediction_folders[option])
+
 # Load the lists of Data (graph) objects to process
-molecules_list = torch.load('./data/lifetime-data/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
-solvents_list = torch.load('./data/lifetime-data/solventGraphs.pt', weights_only=False)
+molecules_list = torch.load(f'./data/{prediction_folders[option]}/molecularGraphs.pt', weights_only=False) # list of PyG Data objects
+solvents_list = torch.load(f'./data/{prediction_folders[option]}/solventGraphs.pt', weights_only=False)
 
 edge_features = molecules_list[0].num_edge_features
 
@@ -19,7 +37,7 @@ for sol in solvents_list:
 # Fill the y-label list with the fluorescence times
 fluorescence_times = []
 
-with open('./data/lifetime-data/lifetime.txt', 'r') as f:
+with open(f'./data/{prediction_folders[option]}/{prediction_files[option]}', 'r') as f:
   for line in f:
     line.strip()
     fluorescence_times.append(float(line))
