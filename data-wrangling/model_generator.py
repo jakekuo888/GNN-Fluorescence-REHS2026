@@ -59,6 +59,8 @@ def get_bond_features(bond):
 
 def smiles_to_graph(smiles):
   mol = Chem.MolFromSmiles(smiles)
+  mol = Chem.AddHs(mol)
+  
   if mol is None:
     print(f"ERR: {smiles} could not be parsed")
     return None

@@ -87,16 +87,16 @@ class GNN(nn.Module):
     edge_attr = self.edge_encoder(edge_attr)
 
     x = self.conv1(x, edge_index, edge_attr)
-    x = torch.relu(x)
     x = self.bn1(x)
+    x = torch.relu(x)
 
     x = self.conv2(x, edge_index, edge_attr)
-    x = torch.relu(x)
     x = self.bn2(x)
-
-    x = self.conv3(x, edge_index, edge_attr)
     x = torch.relu(x)
-    x = self.bn3(x)
+
+    # x = self.conv3(x, edge_index, edge_attr)
+    # x = self.bn3(x)
+    # x = torch.relu(x)
 
     # Readout function is global_add_pool
     graph_readout = global_add_pool(x, batch)
