@@ -29,7 +29,7 @@ def get_atom_features(atom, mol):
   ]
   chirality = [int(atom.GetChiralTag() == c) for c in chirality_options]
 
-  features = atom_type + hybridization + chirality_options + [
+  features = atom_type + hybridization + chirality + [
         atom.GetDegree(),
         atom.GetFormalCharge(),
         atom.GetTotalNumHs(),
