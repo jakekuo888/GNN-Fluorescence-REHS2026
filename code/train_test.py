@@ -1,4 +1,6 @@
 import torch
+import sys
+import subprocess
 import torch.nn as nn
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
@@ -12,6 +14,7 @@ from process_data import y_std, y_mean
 #EASY CONTROLS vvv
 n_epochs = 100
 collect_data = True
+early_stopper = EarlyStop(9, 0.005)
 #EASY CONTROLS ^^^
 
 # Split intro 3 datasets: the real training dataset for the supercomputer, and the sample train/test datasets for testing the initial model
@@ -104,8 +107,6 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
   else:
     return 0.0
 
-early_stopper = EarlyStop(9, 0.0005)
-
 # Train & Test the Model
 with open("./data/plot-data/MSE.txt", "w") as f_:
   for epoch in range(1,n_epochs+1):
@@ -115,8 +116,9 @@ with open("./data/plot-data/MSE.txt", "w") as f_:
     sample_avg_mse = test(mol_validate_loader, sol_validate_loader)
     scheduler.step(float(sample_avg_mse))
 
-    if early_stopper.stop_early(sample_avg_mse):
+    if early_stopper.stop_early(sample_avg_mse, model):
       print(f'Early stop has been initiated on Epoch #{epoch}')
+      early_stopper.restore_best_weights(model)
       break
 
     print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f} | Early stopper count: {early_stopper.count}")
@@ -125,3 +127,9 @@ with open("./data/plot-data/MSE.txt", "w") as f_:
 print("\nUNDERGOING TESTING\n-----------\n")
 test_avg_mse = test(mol_test_loader, sol_test_loader, no_eval=True, print_diff=True)
 print(f"\n------------------------------\nTEST AVERAGE MSE (FINAL RESULTS): {test_avg_mse}\n------------------------------")
+
+if(collect_data):
+  want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
+  if(want_visuals == 'y'):
+    subprocess.run([sys.executable, "./Plots-Visuals/Plots.py"])
+    print("Visuals sucessfully created!\n Check Plots-Visuals/Visuals.")
