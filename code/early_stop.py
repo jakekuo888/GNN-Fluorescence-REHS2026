@@ -1,6 +1,5 @@
 import copy
 
-
 class EarlyStop:
 	def __init__(self, patience = 5, m_delta = 0.0):
 		self.patience = patience
