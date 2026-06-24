@@ -41,8 +41,20 @@ edge_features = molecules_list[0].num_edge_features
 
 model = Model(node_features, edge_features, 128, [128, 128, 128])
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
-criterion = torch.nn.MSELoss()
+criterion = torch.nn.L1Loss()
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+
+total_weights = 0
+total_biases = 0
+
+for name, param in model.named_parameters():
+    if 'weight' in name:
+        total_weights += param.numel()
+    elif 'bias' in name:
+        total_biases += param.numel()
+
+print(f"-----------------------------------\nTotal Weights: {total_weights:,}\n-----------------------------------")
+print(f"-----------------------------------\nTotal Biases: {total_biases:,}\n-----------------------------------")
 
 # Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
 def train(mol_loader, sol_loader):
