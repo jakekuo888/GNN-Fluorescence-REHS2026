@@ -118,7 +118,7 @@ with open("./data/plot-data/MSE.txt", "w") as f_:
 
     if early_stopper.stop_early(sample_avg_mse, model):
       print(f'Early stop has been initiated on Epoch #{epoch}')
-      early_stopper.restore_best_weights(model)
+      early_stopper.restore_best(model)
       break
 
     print(f"Epoch #{epoch} | Train Average MSE: {train_avg_mse:.4f} | Test Average MSE: {sample_avg_mse:.4f} | Early stopper count: {early_stopper.count}")
