@@ -3,9 +3,12 @@ import numpy as np
 import torch
 from model_generator import smiles_to_graph
 
-def generate_and_export_data(csv, mol_label, sol_label, predicted_name, folder):
+def is_null_graph(graph):
+    return graph.x.shape[0] == 1 and graph.x.sum() == 0
+
+def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, folder, out_file):
     dest_path = "edited_chromophores.csv"
-    data_path = f"./data/{csv}"
+    data_path = f"./data/{dataset}.csv"
 
     chromophore_df = pd.read_csv(data_path)
     col_headers = chromophore_df.columns.tolist()
@@ -26,19 +29,16 @@ def generate_and_export_data(csv, mol_label, sol_label, predicted_name, folder):
         if np.isnan(row[predicted_name]):
             #print(f"Data @{idx} is not provided \n SKIPPING")
             continue
-
-        if row[sol_label] == "gas" or row[sol_label] == "NaN":
-            mgraph = smiles_to_graph(row[mol_label])
-            sgraph = smiles_to_graph("")
-            #replace with dummy variable?
-            print(f"SKIP@{idx}: Solvent is labeled as 'gas'")
-            #continue
+        
+        if row[sol_label] == "gas":
+            continue
 
         mgraph = smiles_to_graph(row[mol_label])
         sgraph = smiles_to_graph(row[sol_label])
         if mgraph is None or sgraph is None:
             #print(f"Cannot parse either molecular or solvent smiles @{idx} \n SKIPPING")
             continue
+        
         m_graphs.append(mgraph)
         s_graphs.append(sgraph)
         v_rows.append(idx)
@@ -49,12 +49,12 @@ def generate_and_export_data(csv, mol_label, sol_label, predicted_name, folder):
 
     print("Uploading data")
 
-    with open(f"./data/{folder}/{predicted_name.split()[0]}.txt", "w") as f:
+    with open(f"./data/{folder}/{out_file}", "w") as f:
         for d in Data:
             print(d, file=f)
 
-    torch.save(m_graphs, f"./data/{folder}/molecularGraphs.pt")
-    torch.save(s_graphs, f"./data/{folder}/solventGraphs.pt")
+    torch.save(m_graphs, f"./data/{folder}/molecularGraphs-{dataset}.pt")
+    torch.save(s_graphs, f"./data/{folder}/solventGraphs-{dataset}.pt")
 
     print("Process DONE")
     print(f"Data points collected: {len(Data)}")

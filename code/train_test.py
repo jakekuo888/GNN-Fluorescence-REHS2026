@@ -8,14 +8,27 @@ from sklearn.model_selection import train_test_split
 from neural_networks import Model
 from early_stop import EarlyStop
 
-from process_data import molecules_list, solvents_list
-from process_data import y_std, y_mean
+from process_data import train_molecules_list as molecules_list
+from process_data import train_solvents_list as solvents_list
+from process_data import train_y_mean as y_mean
+from process_data import train_y_std as y_std
+
+from process_data import test_molecules_list, test_solvents_list, test_y_mean, test_y_std
+
+# how many null graphs do you have
+null_mols = sum(1 for mol in molecules_list if mol.x.shape[0] == 1 and mol.x.sum() == 0)
+null_sols = sum(1 for sol in solvents_list if sol.x.shape[0] == 1 and sol.x.sum() == 0)
+print(f"null molecules: {null_mols}")
+print(f"null solvents: {null_sols}")
 
 #EASY CONTROLS vvv
 n_epochs = 100
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 #EASY CONTROLS ^^^
+
+ext_mol_loader = DataLoader(test_molecules_list, batch_size=256, shuffle=False)
+ext_sol_loader = DataLoader(test_solvents_list, batch_size=256, shuffle=False)
 
 # Split intro 3 datasets: the real training dataset for the supercomputer, and the sample train/test datasets for testing the initial model
 mol_train_dataset, mol_split_dataset, sol_train_dataset, sol_split_dataset = train_test_split(
@@ -53,8 +66,8 @@ for name, param in model.named_parameters():
     elif 'bias' in name:
         total_biases += param.numel()
 
-print(f"-----------------------------------\nTotal Weights: {total_weights:,}\n-----------------------------------")
-print(f"-----------------------------------\nTotal Biases: {total_biases:,}\n-----------------------------------")
+# print(f"-----------------------------------\nTotal Weights: {total_weights:,}\n-----------------------------------")
+# print(f"-----------------------------------\nTotal Biases: {total_biases:,}\n-----------------------------------")
 
 # Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
 def train(mol_loader, sol_loader):
@@ -71,7 +84,7 @@ def train(mol_loader, sol_loader):
     optimizer.step()
 
 # Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MAE output)
-def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
+def test(mol_loader, sol_loader, mean, std, no_eval=True, print_diff=False):
   model.eval()
 
   total_mae = 0.0
@@ -87,12 +100,12 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
       )
       
       # Reverse normalization for prediction
-      pred_log = out.squeeze() * y_std + y_mean
+      pred_log = out.squeeze() * std + mean
       pred_actual = torch.exp(pred_log)
       pred_actual = pred_actual.flatten()
 
       # Reverse normalization for target too
-      target_log = mol_data.y.flatten() * y_std + y_mean
+      target_log = mol_data.y.flatten() * std + mean
       target_actual = torch.exp(target_log)
 
       loss = torch.mean(torch.abs(pred_actual - target_actual))
@@ -104,18 +117,18 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
         total_graphs += num_graphs
       if print_diff:
         # Reverse normalization for prediction
-        pred_log = out.squeeze() * y_std + y_mean
+        pred_log = out.squeeze() * std + mean
         pred_actual = torch.exp(pred_log)
         pred_actual = pred_actual.flatten()
 
         # Reverse normalization for target too
-        target_log = mol_data.y.flatten() * y_std + y_mean
+        target_log = mol_data.y.flatten() * std + mean
         target_actual = torch.exp(target_log)
 
         for pred, target in zip(pred_actual, target_actual):
-          print(f"Predicted: {pred.item():.4f}")
-          print(f"Actual:    {target.item():.4f}")
-          print("-" * 30)
+          #print(f"Predicted: {pred.item():.4f}")
+          #print(f"Actual:    {target.item():.4f}")
+          #print("-" * 30)
           if(collect_data): print(f"{pred.item():.4f},{target.item():.4f}", file=f_)
           #load data so it can be used for plotting
 
@@ -134,8 +147,8 @@ with open("./data/plot-data/loss.txt", "w") as f_:
   for epoch in range(1,n_epochs+1):
     train(mol_train_loader, sol_train_loader)
 
-    train_avg_mae = test(mol_train_loader, sol_train_loader)
-    sample_avg_mae = test(mol_validate_loader, sol_validate_loader)
+    train_avg_mae = test(mol_train_loader, sol_train_loader, y_mean, y_std)
+    sample_avg_mae = test(mol_validate_loader, sol_validate_loader, y_mean, y_std)
     scheduler.step(float(sample_avg_mae))
 
     if early_stopper.stop_early(sample_avg_mae, model):
@@ -147,8 +160,12 @@ with open("./data/plot-data/loss.txt", "w") as f_:
     if(collect_data): print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_) #loading data for plotting (train, test)
 
 print("\nUNDERGOING TESTING\n-----------\n")
-test_avg_mae = test(mol_test_loader, sol_test_loader, no_eval=True, print_diff=True)
+test_avg_mae = test(mol_test_loader, sol_test_loader, y_mean, y_std, no_eval=True, print_diff=True)
 print(f"\n------------------------------\nTEST AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n------------------------------")
+
+print("\nTESTING ON EXTERNAL QMWF DATASET\n-----------\n")
+external_avg_mae = test(ext_mol_loader, ext_sol_loader, test_y_mean, test_y_std, no_eval=True, print_diff=True)
+print(f"\n------------------------------\nEXTERNAL AVERAGE MAE (FINAL RESULTS): {external_avg_mae}\n------------------------------")
 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
