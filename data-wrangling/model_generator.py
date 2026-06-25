@@ -60,6 +60,17 @@ def get_bond_features(bond):
 
 def smiles_to_graph(smiles):
   mol = Chem.MolFromSmiles(smiles)
+
+  if mol is None:
+    NUM_NODE_FEATURES = 27
+    NUM_EDGE_FEATURES = 6
+    
+    return Data(
+            x=torch.zeros((1, NUM_NODE_FEATURES), dtype=torch.float),
+            edge_index=torch.zeros((2, 0), dtype=torch.long),
+            edge_attr=torch.zeros((0, NUM_EDGE_FEATURES), dtype=torch.float)
+            )
+
   mol = Chem.AddHs(mol)
 
   rdPartialCharges.ComputeGasteigerCharges(mol)

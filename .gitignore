@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 data/absorption-data/
 data/
+data/plot-data/loss.txt

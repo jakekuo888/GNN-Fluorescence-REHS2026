@@ -35,7 +35,7 @@ sol_train_loader = DataLoader(sol_train_dataset, batch_size=64, shuffle=False)
 sol_validate_loader = DataLoader(sol_validate_dataset, batch_size=64, shuffle=False)
 sol_test_loader = DataLoader(sol_test_dataset, batch_size=128, shuffle=False)
 
-# Set up the Model class (GNN/FFNN), AdamW optimizer, and MSE Loss function
+# Set up the Model class (GNN/FFNN), AdamW optimizer, and MAE Loss function
 node_features = molecules_list[0].num_node_features
 edge_features = molecules_list[0].num_edge_features
 
@@ -70,11 +70,11 @@ def train(mol_loader, sol_loader):
     loss.backward()
     optimizer.step()
 
-# Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MSE output)
+# Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MAE output)
 def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
   model.eval()
 
-  total_mse = 0.0
+  total_mae = 0.0
   total_graphs = 0
   f_ = open("./data/plot-data/pred-act.txt", "w") if not no_eval else None
 
@@ -100,7 +100,7 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
       if no_eval:
         num_graphs = mol_data.num_graphs
 
-        total_mse += loss * num_graphs
+        total_mae += loss * num_graphs
         total_graphs += num_graphs
       if print_diff:
         # Reverse normalization for prediction
@@ -123,35 +123,35 @@ def test(mol_loader, sol_loader, no_eval=True, print_diff=False):
     f_.close()
   
   if no_eval:
-    avg_mse = total_mse / total_graphs
+    avg_mae = total_mae / total_graphs
 
-    return avg_mse
+    return avg_mae
   else:
     return 0.0
 
 # Train & Test the Model
-with open("./data/plot-data/MSE.txt", "w") as f_:
+with open("./data/plot-data/loss.txt", "w") as f_:
   for epoch in range(1,n_epochs+1):
     train(mol_train_loader, sol_train_loader)
 
-    train_avg_mse = test(mol_train_loader, sol_train_loader)
-    sample_avg_mse = test(mol_validate_loader, sol_validate_loader)
-    scheduler.step(float(sample_avg_mse))
+    train_avg_mae = test(mol_train_loader, sol_train_loader)
+    sample_avg_mae = test(mol_validate_loader, sol_validate_loader)
+    scheduler.step(float(sample_avg_mae))
 
-    if early_stopper.stop_early(sample_avg_mse, model):
+    if early_stopper.stop_early(sample_avg_mae, model):
       print(f'Early stop has been initiated on Epoch #{epoch}')
       early_stopper.restore_best(model)
       break
 
-    print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mse:.4f} | Test Average MAE: {sample_avg_mse:.4f} | Early stopper count: {early_stopper.count}")
-    if(collect_data): print(f"{train_avg_mse:.4f}, {sample_avg_mse:.4f}", file=f_) #loading data for plotting (train, test)
+    print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {sample_avg_mae:.4f} | Early stopper count: {early_stopper.count}")
+    if(collect_data): print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_) #loading data for plotting (train, test)
 
 print("\nUNDERGOING TESTING\n-----------\n")
-test_avg_mse = test(mol_test_loader, sol_test_loader, no_eval=True, print_diff=True)
-print(f"\n------------------------------\nTEST AVERAGE MAE (FINAL RESULTS): {test_avg_mse}\n------------------------------")
+test_avg_mae = test(mol_test_loader, sol_test_loader, no_eval=True, print_diff=True)
+print(f"\n------------------------------\nTEST AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n------------------------------")
 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
   if(want_visuals == 'y'):
-    subprocess.run([sys.executable, "./plots-visuals/plot-mse.py"])
-    print("Visuals sucessfully created!\n Check Plots-Visuals/Visuals.")
+    subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
+    print("Visuals sucessfully created!\n Check plots-visuals/new-plots.")
