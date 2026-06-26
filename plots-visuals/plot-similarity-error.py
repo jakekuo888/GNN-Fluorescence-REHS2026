@@ -1,9 +1,18 @@
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit import DataStructs
+import numpy as np
 
 import os
 import matplotlib.pyplot as plt
+
+import numpy as np
+
+def dice_similarity(u, v):
+    # Standard continuous Dice for non-negative embeddings
+    dot_product = np.dot(u, v)
+    denominator = np.sum(u**2) + np.sum(v**2)
+    return (2.0 * dot_product) / denominator if denominator > 0 else 0.0
 
 def plot_smiles_similarity_loss_graph():
 	#title and other information on graph
@@ -31,8 +40,12 @@ def plot_smiles_similarity_loss_graph():
 def plot_vector_similarity_loss_graph(train_vec, test_vec, loss_list):
 	plt.title(f'MAE vs Similarity of GNN Output Vectors (D4C & QMWF Datasets)')
 
-	compare_to = []
+	output_similarities = []
 
 	for vec in test_vec:
+		max_dice_sim = 0.0
 		for pot_vec in train_vec:
-			
+			temp_sim = dice_similarity(vec, pot_vec)
+			if temp_sim > max_dice_sim:
+				max_dice_sim = temp_sim
+		output_similarities.append(max_dice_sim)
