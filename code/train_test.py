@@ -15,17 +15,17 @@ from process_data import train_y_std as y_std
 
 from process_data import test_molecules_list, test_solvents_list, test_y_mean, test_y_std
 
+#EASY CONTROLS vvv
+n_epochs = 10
+collect_data = True
+early_stopper = EarlyStop(9, 0.005)
+#EASY CONTROLS ^^^
+
 # how many null graphs do you have
 null_mols = sum(1 for mol in molecules_list if mol.x.shape[0] == 1 and mol.x.sum() == 0)
 null_sols = sum(1 for sol in solvents_list if sol.x.shape[0] == 1 and sol.x.sum() == 0)
 print(f"null molecules: {null_mols}")
 print(f"null solvents: {null_sols}")
-
-#EASY CONTROLS vvv
-n_epochs = 100
-collect_data = True
-early_stopper = EarlyStop(9, 0.005)
-#EASY CONTROLS ^^^
 
 ext_mol_loader = DataLoader(test_molecules_list, batch_size=256, shuffle=False)
 ext_sol_loader = DataLoader(test_solvents_list, batch_size=256, shuffle=False)
@@ -170,5 +170,7 @@ print(f"\n------------------------------\nEXTERNAL AVERAGE MAE (FINAL RESULTS): 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
   if(want_visuals == 'y'):
+    print("Creating plotting loss visuals \n ...")
     subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
-    print("Visuals sucessfully created!\n Check plots-visuals/new-plots.")
+    print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
+    print("DONE")
