@@ -20,8 +20,12 @@ from process_data import test_molecules_list, test_solvents_list, test_y_mean, t
 
 from process_data import absorption_data, PredOption, generate_graphs_labels
 
+from plot_similarity_error import plot_vector_similarity_loss_graph
+
+
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(root_dir, 'data-wrangling'))
+sys.path.append(os.path.join(root_dir, 'plots-visuals'))
 
 from data_conversion import generate_and_export_data
 
@@ -194,14 +198,13 @@ print(f"\n------------------------------\nEXTERNAL AVERAGE MAE (FINAL RESULTS): 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
   if(want_visuals == 'y'):
+
     print("Creating plotting loss visuals \n ...")
     subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
     print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
+    
+    print("Creating scatterplot of the error vs similarity \n ...")
+    plot_vector_similarity_loss_graph(train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
+    print("Scatterplot successfully created! \n Check plots-visuals/new-plots")
+    
     print("DONE")
-
-root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(os.path.join(root_dir, 'plots-visuals'))
-
-from plot_similarity_error import plot_vector_similarity_loss_graph
-
-plot_vector_similarity_loss_graph(train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
