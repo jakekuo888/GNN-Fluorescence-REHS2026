@@ -48,12 +48,8 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
             sol.edge_index = torch.zeros((2, 0), dtype=torch.long)
 
     # Fill the y-label list with the fluorescence times
-    y_labels = []
-
     with open(f'./data/{chosen_option.out_folder}/{chosen_option.out_file}', 'r') as f:
-        for line in f:
-            line.strip()
-            y_labels.append(float(line))
+        y_labels = [float(line) for line in f.read().splitlines() if line.strip()]
 
     y_tensor = torch.tensor(y_labels, dtype=torch.float)
 
