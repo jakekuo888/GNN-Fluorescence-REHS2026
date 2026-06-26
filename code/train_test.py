@@ -5,6 +5,9 @@ import torch.nn as nn
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
 
+import sys
+import os
+
 from neural_networks import Model
 from early_stop import EarlyStop
 
@@ -16,9 +19,13 @@ from process_data import train_y_std as y_std
 from process_data import test_molecules_list, test_solvents_list, test_y_mean, test_y_std
 
 from process_data import absorption_data, PredOption, generate_graphs_labels
+
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(os.path.join(root_dir, 'data-wrangling'))
+
 from data_conversion import generate_and_export_data
 
-re_generate_data = True
+re_generate_data = False
 
 if re_generate_data:
   chosen_option = absorption_data[0]
@@ -188,3 +195,10 @@ if(collect_data):
     subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
     print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
     print("DONE")
+
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(os.path.join(root_dir, 'plots-visuals'))
+
+from plot_similarity_error import plot_vector_similarity_loss_graph
+
+plot_vector_similarity_loss_graph(train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
