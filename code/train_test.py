@@ -107,13 +107,11 @@ test_vectors_for_similarity = []
 test_losses_for_similarity = []
 
 # Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MAE output)
-def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False, is_test_set=False, do_plot=False):
+def test(mol_loader, sol_loader, mean, std, compute_mae=True, is_test_set=False, collect_plot_data=False):
   model.eval()
 
   total_mae = 0.0
   total_graphs = 0
-  f_ = open("./data/plot-data/pred-act.txt", "w") if print_diff else None
-  f_2 = open("./data/plot-data/plot-similarity.txt", "w") if print_diff else None 
 
   with torch.no_grad():
 
@@ -134,9 +132,9 @@ def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False, 
 
       loss = torch.mean(torch.abs(pred_actual - target_actual))
 
-      if do_plot and not is_test_set:
+      if collect_plot_data and not is_test_set:
           train_vectors_for_similarity.extend(vector_out.unbind(0))
-      elif do_plot:
+      elif collect_plot_data:
           test_vectors_for_similarity.extend(vector_out.unbind(0))
           test_losses_for_similarity.extend([torch.abs(p - t).item() 
                                               for p, t in zip(pred_actual, target_actual)])
@@ -145,21 +143,6 @@ def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False, 
         num_graphs = mol_data.num_graphs
         total_mae += loss * num_graphs
         total_graphs += num_graphs
-
-      if print_diff:
-        mol_smiles = mol_data.smiles
-        sol_smiles = sol_data.smiles
-
-        for pred, target, m_smi, s_smi in zip(pred_actual, target_actual, mol_smiles, sol_smiles):
-          if(collect_data):
-            print(f"{pred.item():.4f},{target.item():.4f}", file=f_)
-            print(f"{target.item():.4f},{pred.item():.4f},{m_smi},{s_smi}", file=f_2)
-            #printing data out into txt files so it can be plotted later
-
-
-  if f_ is not None:
-    f_.close()
-    f_2.close()
   
   if compute_mae:
     avg_mae = total_mae / total_graphs
