@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def dice_similarity(u, v):
-    # Standard continuous Dice for non-negative embeddings
+    u = u.detach().cpu().numpy()
+    v = v.detach().cpu().numpy()
     dot_product = np.dot(u, v)
     denominator = np.sum(u**2) + np.sum(v**2)
     return (2.0 * dot_product) / denominator if denominator > 0 else 0.0
@@ -40,16 +41,20 @@ def plot_smiles_similarity_loss_graph():
 def plot_vector_similarity_loss_graph(train_vec, test_vec, loss_list):
 	print(f"trainvec: {train_vec}, test_vec: {test_vec}, loss_list: {loss_list}")
 	plt.title(f'MAE vs Similarity of GNN Output Vectors (D4C & QMWF Datasets)')
+	
+	train_mat = np.stack([v.detach().cpu().numpy() for v in train_vec])  # (n_train, hidden)
+	test_mat = np.stack([v.detach().cpu().numpy() for v in test_vec])    # (n_test, hidden)
 
-	output_similarities = []
+	# vectorized dice similarity
+	dot_products = test_mat @ train_mat.T  # (n_test, n_train)
+	test_sq = np.sum(test_mat**2, axis=1, keepdims=True)   # (n_test, 1)
+	train_sq = np.sum(train_mat**2, axis=1, keepdims=True)  # (n_train, 1)
+	denominators = test_sq + train_sq.T  # (n_test, n_train)
+	
+	similarities = np.where(denominators > 0, 2.0 * dot_products / denominators, 0.0)
+	output_similarities = similarities.max(axis=1)  # (n_test,) max over train set
 
-	for vec in test_vec:
-		max_dice_sim = 0.0
-		for pot_vec in train_vec:
-			temp_sim = dice_similarity(vec, pot_vec)
-			if temp_sim > max_dice_sim:
-				max_dice_sim = temp_sim
-		output_similarities.append(max_dice_sim)
+	print("OUT_SIM LEN: " + str(len(output_similarities)))
 
 	plt.scatter(output_similarities, loss_list, c=loss_list, cmap='Blues', edgecolors='black')
 	plt.colorbar(label='')

@@ -37,7 +37,7 @@ if re_generate_data:
   test_molecules_list, test_solvents_list, test_y_mean, test_y_std = generate_graphs_labels(chosen_option, y_mean=y_mean, y_std=y_std, normalize=False)
 
 #EASY CONTROLS vvv
-n_epochs = 3
+n_epochs = 1
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 #EASY CONTROLS ^^^
@@ -103,7 +103,7 @@ test_vectors_for_similarity = []
 test_losses_for_similarity = []
 
 # Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MAE output)
-def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False, is_test_set=False):
+def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False, is_test_set=False, do_plot=False):
   model.eval()
 
   total_mae = 0.0
@@ -130,11 +130,12 @@ def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False, 
 
       loss = torch.mean(torch.abs(pred_actual - target_actual))
 
-      if print_diff and not is_test_set:
-        train_vectors_for_similarity.append(vector_out)
-      elif print_diff:
-        test_vectors_for_similarity.append(vector_out)
-        test_losses_for_similarity.append(vector_out)
+      if do_plot and not is_test_set:
+          train_vectors_for_similarity.extend(vector_out.unbind(0))
+      elif do_plot:
+          test_vectors_for_similarity.extend(vector_out.unbind(0))
+          test_losses_for_similarity.extend([torch.abs(p - t).item() 
+                                              for p, t in zip(pred_actual, target_actual)])
 
       if compute_mae:
         num_graphs = mol_data.num_graphs
@@ -180,12 +181,14 @@ with open("./data/plot-data/loss.txt", "w") as f_:
     print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {sample_avg_mae:.4f} | Early stopper count: {early_stopper.count}")
     if(collect_data): print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_) #loading data for plotting (train, test)
 
+train_avg_mse = test(mol_train_dataset, sol_train_dataset, y_mean, y_std, compute_mae=False, print_diff=True, do_plot=True)
+
 print("\nUNDERGOING TESTING\n-----------\n")
-test_avg_mae = test(mol_test_loader, sol_test_loader, y_mean, y_std, compute_mae=True, print_diff=True)
+test_avg_mae = test(mol_test_loader, sol_test_loader, y_mean, y_std, compute_mae=True, print_diff=True, do_plot=False)
 print(f"\n------------------------------\nTEST AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n------------------------------")
 
 print("\nTESTING ON EXTERNAL QMWF DATASET\n-----------\n")
-external_avg_mae = test(ext_mol_loader, ext_sol_loader, test_y_mean, test_y_std, compute_mae=True, print_diff=True)
+external_avg_mae = test(ext_mol_loader, ext_sol_loader, test_y_mean, test_y_std, compute_mae=True, print_diff=True, is_test_set=True, do_plot=True)
 print(f"\n------------------------------\nEXTERNAL AVERAGE MAE (FINAL RESULTS): {external_avg_mae}\n------------------------------")
 
 if(collect_data):
