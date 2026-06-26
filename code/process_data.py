@@ -76,7 +76,7 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
 
     return molecules_list, solvents_list, y_mean, y_std
 
-re_generate_data = True
+re_generate_data = False
 
 chosen_option = d4c_absorption
 

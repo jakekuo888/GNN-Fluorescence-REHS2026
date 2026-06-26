@@ -137,4 +137,4 @@ class Model(nn.Module):
     
     fluorescence_time = self.ffnn(final_readout)
 
-    return fluorescence_time
+    return final_readout, fluorescence_time
