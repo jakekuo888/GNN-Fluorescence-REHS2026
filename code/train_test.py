@@ -16,7 +16,7 @@ from process_data import train_y_std as y_std
 from process_data import test_molecules_list, test_solvents_list, test_y_mean, test_y_std
 
 #EASY CONTROLS vvv
-n_epochs = 10
+n_epochs = 3
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 #EASY CONTROLS ^^^
@@ -84,12 +84,13 @@ def train(mol_loader, sol_loader):
     optimizer.step()
 
 # Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MAE output)
-def test(mol_loader, sol_loader, mean, std, no_eval=True, print_diff=False):
+def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False):
   model.eval()
 
   total_mae = 0.0
   total_graphs = 0
-  f_ = open("./data/plot-data/pred-act.txt", "w") if not no_eval else None
+  f_ = open("./data/plot-data/pred-act.txt", "w") if print_diff else None
+  f_2 = open("./data/plot-data/plot-similarity.txt", "w") if print_diff else None 
 
   with torch.no_grad():
 
@@ -110,32 +111,27 @@ def test(mol_loader, sol_loader, mean, std, no_eval=True, print_diff=False):
 
       loss = torch.mean(torch.abs(pred_actual - target_actual))
 
-      if no_eval:
+      if compute_mae:
         num_graphs = mol_data.num_graphs
-
         total_mae += loss * num_graphs
         total_graphs += num_graphs
+
       if print_diff:
-        # Reverse normalization for prediction
-        pred_log = out.squeeze() * std + mean
-        pred_actual = torch.exp(pred_log)
-        pred_actual = pred_actual.flatten()
+        mol_smiles = mol_data.smiles
+        sol_smiles = sol_data.smiles
 
-        # Reverse normalization for target too
-        target_log = mol_data.y.flatten() * std + mean
-        target_actual = torch.exp(target_log)
+        for pred, target, m_smi, s_smi in zip(pred_actual, target_actual, mol_smiles, sol_smiles):
+          if(collect_data):
+            print(f"{pred.item():.4f},{target.item():.4f}", file=f_)
+            print(f"{target.item():.4f},{pred.item():.4f},{m_smi},{s_smi}", file=f_2)
+            #printing data out into txt files so it can be plotted later
 
-        for pred, target in zip(pred_actual, target_actual):
-          #print(f"Predicted: {pred.item():.4f}")
-          #print(f"Actual:    {target.item():.4f}")
-          #print("-" * 30)
-          if(collect_data): print(f"{pred.item():.4f},{target.item():.4f}", file=f_)
-          #load data so it can be used for plotting
 
   if f_ is not None:
     f_.close()
+    f_2.close()
   
-  if no_eval:
+  if compute_mae:
     avg_mae = total_mae / total_graphs
 
     return avg_mae
@@ -160,11 +156,11 @@ with open("./data/plot-data/loss.txt", "w") as f_:
     if(collect_data): print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_) #loading data for plotting (train, test)
 
 print("\nUNDERGOING TESTING\n-----------\n")
-test_avg_mae = test(mol_test_loader, sol_test_loader, y_mean, y_std, no_eval=True, print_diff=True)
+test_avg_mae = test(mol_test_loader, sol_test_loader, y_mean, y_std, compute_mae=True, print_diff=True)
 print(f"\n------------------------------\nTEST AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n------------------------------")
 
 print("\nTESTING ON EXTERNAL QMWF DATASET\n-----------\n")
-external_avg_mae = test(ext_mol_loader, ext_sol_loader, test_y_mean, test_y_std, no_eval=True, print_diff=True)
+external_avg_mae = test(ext_mol_loader, ext_sol_loader, test_y_mean, test_y_std, compute_mae=True, print_diff=True)
 print(f"\n------------------------------\nEXTERNAL AVERAGE MAE (FINAL RESULTS): {external_avg_mae}\n------------------------------")
 
 if(collect_data):

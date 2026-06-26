@@ -18,7 +18,6 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
         if h not in (mol_label, sol_label, predicted_name)
     ])
 
-
     m_graphs = []
     s_graphs = []
     v_rows = [] #valid_rows
@@ -29,8 +28,12 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
         if np.isnan(row[predicted_name]):
             #print(f"Data @{idx} is not provided \n SKIPPING")
             continue
-        
+
         if row[sol_label] == "gas":
+            continue
+
+        if pd.isna(row[mol_label]) or pd.isna(row[sol_label]):
+            #print(f"Missing SMILES @{idx} \n SKIPPING")
             continue
 
         mgraph = smiles_to_graph(row[mol_label])
@@ -38,7 +41,10 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
         if mgraph is None or sgraph is None:
             #print(f"Cannot parse either molecular or solvent smiles @{idx} \n SKIPPING")
             continue
-        
+
+        mgraph.smiles = str(row[mol_label])
+        sgraph.smiles = str(row[sol_label])
+
         m_graphs.append(mgraph)
         s_graphs.append(sgraph)
         v_rows.append(idx)

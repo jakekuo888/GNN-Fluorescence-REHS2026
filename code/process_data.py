@@ -7,8 +7,6 @@ from sklearn.model_selection import train_test_split
 import os
 import sys
 
-print("Taking in data")
-
 # Finds the root directory (one level up from main_script.py)
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(root_dir, 'data-wrangling'))

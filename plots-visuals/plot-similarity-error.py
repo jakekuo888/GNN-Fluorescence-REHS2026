@@ -1,6 +1,13 @@
-import rdkit
+from rdkit import Chem
+from rdkit.Chem import AllChem
+from rdkit import DataStructs
 
 import os
 import matplotlib.pyplot as plt
 
-# This file 
+"""
+
+"""
+
+with open("")
+mol_solv = []
