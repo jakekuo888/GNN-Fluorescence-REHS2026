@@ -38,6 +38,7 @@ def plot_smiles_similarity_loss_graph():
 		mol.append(Chem.MolFromSmiles(m))
 
 def plot_vector_similarity_loss_graph(train_vec, test_vec, loss_list):
+	print(f"trainvec: {train_vec}, test_vec: {test_vec}, loss_list: {loss_list}")
 	plt.title(f'MAE vs Similarity of GNN Output Vectors (D4C & QMWF Datasets)')
 
 	output_similarities = []
