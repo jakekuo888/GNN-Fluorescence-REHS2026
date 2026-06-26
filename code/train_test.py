@@ -16,7 +16,7 @@ from process_data import train_y_std as y_std
 from process_data import test_molecules_list, test_solvents_list, test_y_mean, test_y_std
 
 #EASY CONTROLS vvv
-n_epochs = 100
+n_epochs = 10
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 #EASY CONTROLS ^^^
@@ -170,5 +170,7 @@ print(f"\n------------------------------\nEXTERNAL AVERAGE MAE (FINAL RESULTS): 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
   if(want_visuals == 'y'):
+    print("Creating plotting loss visuals \n ...")
     subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
-    print("Visuals sucessfully created!\n Check plots-visuals/new-plots.")
+    print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
+    print("DONE")
