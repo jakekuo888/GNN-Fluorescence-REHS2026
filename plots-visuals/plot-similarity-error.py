@@ -49,3 +49,5 @@ def plot_vector_similarity_loss_graph(train_vec, test_vec, loss_list):
 			if temp_sim > max_dice_sim:
 				max_dice_sim = temp_sim
 		output_similarities.append(max_dice_sim)
+
+	plt.scatter(output_similarities, loss_list, 'ro', markersize = 10)
