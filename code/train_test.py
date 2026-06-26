@@ -15,17 +15,25 @@ from process_data import train_y_std as y_std
 
 from process_data import test_molecules_list, test_solvents_list, test_y_mean, test_y_std
 
+from process_data import absorption_data, PredOption, generate_graphs_labels
+from data_conversion import generate_and_export_data
+
+re_generate_data = True
+
+if re_generate_data:
+  chosen_option = absorption_data[0]
+  generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
+  molecules_list, solvents_list, y_mean, y_std = generate_graphs_labels(chosen_option)
+
+  chosen_option = absorption_data[1]
+  generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
+  test_molecules_list, test_solvents_list, test_y_mean, test_y_std = generate_graphs_labels(chosen_option, y_mean=y_mean, y_std=y_std, normalize=False)
+
 #EASY CONTROLS vvv
 n_epochs = 3
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 #EASY CONTROLS ^^^
-
-# how many null graphs do you have
-null_mols = sum(1 for mol in molecules_list if mol.x.shape[0] == 1 and mol.x.sum() == 0)
-null_sols = sum(1 for sol in solvents_list if sol.x.shape[0] == 1 and sol.x.sum() == 0)
-print(f"null molecules: {null_mols}")
-print(f"null solvents: {null_sols}")
 
 ext_mol_loader = DataLoader(test_molecules_list, batch_size=256, shuffle=False)
 ext_sol_loader = DataLoader(test_solvents_list, batch_size=256, shuffle=False)
@@ -74,7 +82,7 @@ def train(mol_loader, sol_loader):
   model.train()
 
   for mol_data, sol_data in zip(mol_loader, sol_loader):
-    out = model(
+    vector_out, out = model(
       mol_data.x, mol_data.edge_index, mol_data.edge_attr, mol_data.batch,
       sol_data.x, sol_data.edge_index, sol_data.edge_attr, sol_data.batch
     )
@@ -83,8 +91,12 @@ def train(mol_loader, sol_loader):
     loss.backward()
     optimizer.step()
 
+train_vectors_for_similarity = []
+test_vectors_for_similarity = []
+test_losses_for_similarity = []
+
 # Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MAE output)
-def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False):
+def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False, is_test_set=False):
   model.eval()
 
   total_mae = 0.0
@@ -95,7 +107,7 @@ def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False):
   with torch.no_grad():
 
     for mol_data, sol_data in zip(mol_loader, sol_loader):
-      out = model(
+      vector_out, out = model(
         mol_data.x, mol_data.edge_index, mol_data.edge_attr, mol_data.batch,
         sol_data.x, sol_data.edge_index, sol_data.edge_attr, sol_data.batch
       )
@@ -110,6 +122,12 @@ def test(mol_loader, sol_loader, mean, std, compute_mae=True, print_diff=False):
       target_actual = torch.exp(target_log)
 
       loss = torch.mean(torch.abs(pred_actual - target_actual))
+
+      if print_diff and not is_test_set:
+        train_vectors_for_similarity.append(vector_out)
+      elif print_diff:
+        test_vectors_for_similarity.append(vector_out)
+        test_losses_for_similarity.append(vector_out)
 
       if compute_mae:
         num_graphs = mol_data.num_graphs
