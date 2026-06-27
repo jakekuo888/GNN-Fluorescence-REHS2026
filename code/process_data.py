@@ -74,8 +74,15 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
     for data, label in zip(molecules_list, y_normalized):
         data.y = label.view(-1, 1) # View(-1,1) returns size [1,1] because y_normalized is a tensor
 
-    return molecules_list, solvents_list, y_mean, y_std
+    smiles_for_similarity = []
 
+    for data in molecules_list:
+        smiles_for_similarity.append(data.smiles)
+
+    return molecules_list, solvents_list, y_mean, y_std, smiles_for_similarity
+
+
+# TEST CODE MAINLY
 re_generate_data = False
 
 chosen_option = d4c_absorption
@@ -83,11 +90,11 @@ chosen_option = d4c_absorption
 if re_generate_data:
     generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
 
-train_molecules_list, train_solvents_list, train_y_mean, train_y_std = generate_graphs_labels(chosen_option)
+train_molecules_list, train_solvents_list, train_y_mean, train_y_std, train_smiles_for_similarity = generate_graphs_labels(chosen_option)
 
 chosen_option = qmwf_absorption
 
 if re_generate_data:
     generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
 
-test_molecules_list, test_solvents_list, test_y_mean, test_y_std = generate_graphs_labels(chosen_option, y_mean=train_y_mean, y_std=train_y_std, normalize=False)
+test_molecules_list, test_solvents_list, test_y_mean, test_y_std, test_smiles_for_similarity = generate_graphs_labels(chosen_option, y_mean=train_y_mean, y_std=train_y_std, normalize=False)

@@ -16,17 +16,15 @@ from process_data import train_solvents_list as solvents_list
 from process_data import train_y_mean as y_mean
 from process_data import train_y_std as y_std
 
-from process_data import test_molecules_list, test_solvents_list, test_y_mean, test_y_std
+from process_data import test_molecules_list, test_solvents_list, test_y_mean, test_y_std, train_smiles_for_similarity, test_smiles_for_similarity
 
 from process_data import absorption_data, PredOption, generate_graphs_labels
-
-from plot_similarity_error import plot_vector_similarity_loss_graph
-
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(root_dir, 'data-wrangling'))
 sys.path.append(os.path.join(root_dir, 'plots-visuals'))
 
+from plot_similarity_error import plot_vector_similarity_loss_graph, plot_smiles_similarity_loss_graph
 from data_conversion import generate_and_export_data
 
 re_generate_data = False
@@ -34,14 +32,15 @@ re_generate_data = False
 if re_generate_data:
   chosen_option = absorption_data[0]
   generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
-  molecules_list, solvents_list, y_mean, y_std = generate_graphs_labels(chosen_option)
-
+  
   chosen_option = absorption_data[1]
   generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
-  test_molecules_list, test_solvents_list, test_y_mean, test_y_std = generate_graphs_labels(chosen_option, y_mean=y_mean, y_std=y_std, normalize=False)
+  
+molecules_list, solvents_list, y_mean, y_std, train_smiles_for_similarity = generate_graphs_labels(absorption_data[0])
+test_molecules_list, test_solvents_list, test_y_mean, test_y_std, test_smiles_for_similarity = generate_graphs_labels(absorption_data[1], y_mean=y_mean, y_std=y_std, normalize=False)
 
 #EASY CONTROLS vvv
-n_epochs = 1
+n_epochs = 100
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 #EASY CONTROLS ^^^
@@ -84,9 +83,6 @@ for name, param in model.named_parameters():
         total_weights += param.numel()
     elif 'bias' in name:
         total_biases += param.numel()
-
-# print(f"-----------------------------------\nTotal Weights: {total_weights:,}\n-----------------------------------")
-# print(f"-----------------------------------\nTotal Biases: {total_biases:,}\n-----------------------------------")
 
 # Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
 def train(mol_loader, sol_loader):
@@ -168,15 +164,19 @@ with open("./data/plot-data/loss.txt", "w") as f_:
     print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {sample_avg_mae:.4f} | Early stopper count: {early_stopper.count}")
     if(collect_data): print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_) #loading data for plotting (train, test)
 
-train_avg_mse = test(mol_train_dataset, sol_train_dataset, y_mean, y_std, compute_mae=False, print_diff=True, do_plot=True)
+print("UNDERGOING TESTING")
+print("-" * 45)
+test_avg_mae = test(mol_test_loader, sol_test_loader, y_mean, y_std, compute_mae=True)
+print(f"TEST AVERAGE MAE (FINAL RESULTS): {test_avg_mae}")
+print("-" * 45)
 
-print("\nUNDERGOING TESTING\n-----------\n")
-test_avg_mae = test(mol_test_loader, sol_test_loader, y_mean, y_std, compute_mae=True, print_diff=True, do_plot=False)
-print(f"\n------------------------------\nTEST AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n------------------------------")
+print("TESTING ON EXTERNAL QMWF DATASET")
+external_avg_mae = test(ext_mol_loader, ext_sol_loader, test_y_mean, test_y_std, compute_mae=True, is_test_set=True, collect_plot_data=True)
+print("-" * 45)
+print(f"EXTERNAL AVERAGE MAE (FINAL RESULTS): {external_avg_mae}")
+print("-" * 45)
 
-print("\nTESTING ON EXTERNAL QMWF DATASET\n-----------\n")
-external_avg_mae = test(ext_mol_loader, ext_sol_loader, test_y_mean, test_y_std, compute_mae=True, print_diff=True, is_test_set=True, do_plot=True)
-print(f"\n------------------------------\nEXTERNAL AVERAGE MAE (FINAL RESULTS): {external_avg_mae}\n------------------------------")
+train_avg_mse = test(mol_train_dataset, sol_train_dataset, y_mean, y_std, compute_mae=False, collect_plot_data=True)
 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
@@ -186,8 +186,11 @@ if(collect_data):
     subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
     print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
     
-    print("Creating scatterplot of the error vs similarity \n ...")
+    print("Creating scatterplot of the error vs similarity (vectors) \n ...")
     plot_vector_similarity_loss_graph(train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
     print("Scatterplot successfully created! \n Check plots-visuals/new-plots")
+
+    print("Creating scatterplot of the error vs similarity (smiles) \n ...")
+    plot_smiles_similarity_loss_graph(train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)
     
     print("DONE")
