@@ -65,18 +65,53 @@ def get_bond_features(bond):
   return features
 
 def resolve_smiles(name, dictionary, file):
-   if name in dictionary:
-      return dictionary[name]
-   else:
-    print(f"Fetching SMILES for: {name}")
-    result = cirpy.resolve(name, 'smiles')
-    dictionary[name] = result  # cache even if None
-    
-    # save updated cache to disk
-    with open(file, 'w') as f:
-        json.dump(dictionary, f)
-    
-    return result
+    blocker = rdBase.BlockLogs()
+
+    SOLVENT_MANUAL_MAP = {
+        # spacing variants of DCM
+        'CH2Cl2': 'ClCCl',
+        'CH 2 Cl 2': 'ClCCl',
+        'CH 2 Cl': 'ClCCl',
+        # acetonitrile
+        'CH3CN': 'CC#N',
+        'CH 3 CN': 'CC#N',
+        # methanol
+        'CH3OH': 'CO',
+        'CH 3 OH': 'CO',
+        # benzene
+        'C6H6': 'c1ccccc1',
+        # cyclohexane
+        'C6H12': 'C1CCCCC1',
+        # ethyl acetate
+        'EtOAc': 'CCOC(C)=O',
+        # MTHF (2-methyltetrahydrofuran)
+        'MTHF': 'C1CCC(C)O1',
+        # benzonitrile
+        'PhCN': 'N#Cc1ccccc1',
+        # DMSO typo
+        'dimethylsufoxide': 'CS(C)=O',
+        # water
+        'H 2 O': 'O',
+    }
+
+    mol = Chem.MolFromSmiles(str(name))
+    if mol is None:
+        if name in SOLVENT_MANUAL_MAP:
+            return SOLVENT_MANUAL_MAP[name]
+        if name in dictionary:
+            return dictionary[name]
+        else:
+            print(f"Fetching SMILES for: {name}")
+            result = cirpy.resolve(name, 'smiles')
+            dictionary[name] = result  # cache even if None
+            
+            # save updated cache to disk
+            with open(file, 'w') as f:
+                json.dump(dictionary, f)
+            
+            return result
+    else:
+        return name
 
 def smiles_to_graph(smiles):
   blocker = rdBase.BlockLogs()

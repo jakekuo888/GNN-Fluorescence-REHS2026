@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
 import torch
-from model_generator import smiles_to_graph, smiles_to_morgan_fp
+from model_generator import smiles_to_graph, smiles_to_morgan_fp, resolve_smiles
 from rdkit.Chem import rdFingerprintGenerator
+import os
+import json
 
 def is_null_graph(graph):
     return graph.x.shape[0] == 1 and graph.x.sum() == 0
@@ -28,6 +30,13 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
 
     fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
+    CACHE_FILE = './data/solvent_cache.json'
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, 'r') as f:
+            SOLVENT_SMILES = json.load(f)
+    else:
+        SOLVENT_SMILES = {}
+
     for idx, row in chromophore_df.iterrows():
         if np.isnan(row[predicted_name]):
             #print(f"Data @{idx} is not provided \n SKIPPING")
@@ -41,11 +50,15 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
             continue
 
         mgraph = smiles_to_graph(row[mol_label])
-        sprint = smiles_to_morgan_fp(fp_gen, row[sol_label])
+        sol_smiles = resolve_smiles(row[sol_label], SOLVENT_SMILES, CACHE_FILE)
         #sgraph = smiles_to_graph(row[sol_label])
-        if mgraph is None or sprint is None:
+        if sol_smiles is None:
+            print(f"Failed to resolve: '{row[sol_label]}'")
+        if mgraph is None or sol_smiles is None:
             #print(f"Cannot parse either molecular or solvent smiles @{idx} \n SKIPPING")
             continue
+
+        sprint = smiles_to_morgan_fp(fp_gen, sol_smiles)
 
         mgraph.smiles = str(row[mol_label])
         #sgraph.smiles = str(row[sol_label])
@@ -69,7 +82,7 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
 
     torch.save(m_graphs, f"./data/{folder}/molecularGraphs-{dataset}.pt")
     #torch.save(s_graphs, f"./data/{folder}/solventGraphs-{dataset}.pt")
-    np.save(f"./data/{folder}/solventFingerprints-{dataset}.pt", fp_matrix)
+    np.savez_compressed(f"./data/{folder}/solventFingerprints-{dataset}.npz", fps=fp_matrix)
 
     print("Process DONE")
     print(f"Data points collected: {len(Data)}")

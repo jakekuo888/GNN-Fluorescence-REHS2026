@@ -39,8 +39,12 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
     # Load the lists of Data (graph) objects to process
     molecules_list = torch.load(f'./data/{chosen_option.out_folder}/molecularGraphs-{chosen_option.dataset}.pt', weights_only=False) # list of PyG Data objects
     # solvents_list = torch.load(f'./data/{chosen_option.out_folder}/solventGraphs-{chosen_option.dataset}.pt', weights_only=False)
-    solvent_fps = np.load(f'./data/{chosen_option.out_folder}/solventFingerprints-{chosen_option.dataset}.pt')
-    solvents_list = [row for row in solvent_fps]
+    solvent_archive = np.load(f'./data/{chosen_option.out_folder}/solventFingerprints-{chosen_option.dataset}.npz')
+
+    matrix_key = list(solvent_archive.keys())[0] 
+    solvent_matrix = solvent_archive[matrix_key]
+
+    solvents_list = [row for row in solvent_matrix]
 
     edge_features = molecules_list[0].num_edge_features
     solv_features = solvents_list[0].size

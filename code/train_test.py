@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import sys
 import subprocess
 import torch.nn as nn
@@ -86,12 +87,6 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
 criterion = torch.nn.L1Loss()
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
-for name, param in model.named_parameters():
-    if 'weight' in name:
-        total_weights += param.numel()
-    elif 'bias' in name:
-        total_biases += param.numel()
-
 # Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
 def train(loader):
   model.train()
@@ -99,8 +94,9 @@ def train(loader):
   for data in loader:
     data.to(device)
 
+    sol_fp = torch.tensor(np.array(data.sol_fp), dtype=torch.float).to(device)
     vector_out, out = model(
-      data.x, data.edge_index, data.edge_attr, data.batch, data.fp
+      data.x, data.edge_index, data.edge_attr, data.batch, sol_fp
     )
     loss = criterion(out, data.y.view(-1,1))
     optimizer.zero_grad()
@@ -123,8 +119,9 @@ def test(loader, mean, std, compute_mae=True, is_test_set=False, collect_plot_da
     for data in loader:
       data.to(device)
 
+      sol_fp = torch.tensor(np.array(data.sol_fp), dtype=torch.float).to(device)
       vector_out, out = model(
-        data.x, data.edge_index, data.edge_attr, data.batch, data.fp
+        data.x, data.edge_index, data.edge_attr, data.batch, sol_fp
       )
       
       # Reverse normalization for prediction
