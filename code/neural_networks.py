@@ -115,26 +115,11 @@ class ModelTwo(nn.Module):
     self.gnn_mol = GNN(node_features, edge_features, hidden_channels) 
     #solv_features is the length of the morgan fingerprint
     self.ffnn_solv = FFNN(solv_features, hidden_channels, solv_hidden_sizes)
-
-    #self.cross_attn1 = nn.MultiheadAttention(hidden_channels, num_heads=4, batch_first=True)
-    #self.cross_attn2 = nn.MultiheadAttention(hidden_channels, num_heads=4, batch_first=True)
-
     self.ffnn = FFNN(2*hidden_channels, 1, hidden_sizes)
 
   def forward(self, xm, mol_edge_index, mol_edge_attr, mol_batch, solv_morgan):
     readout_vector_mol = self.gnn_mol(xm, mol_edge_index, mol_edge_attr, mol_batch)
     readout_vector_sol = self.ffnn_solv(solv_morgan)
-
-    # mol_q = readout_vector_mol.unsqueeze(1)
-    # sol_q = readout_vector_sol.unsqueeze(1)
-
-    # mol attends to sol
-    # mol_attn, _ = self.cross_attn1(mol_q, sol_q, sol_q)
-    # mol_out = readout_vector_mol + mol_attn.squeeze(1)
-
-    # sol attends to mol
-    # sol_attn, _ = self.cross_attn2(sol_q, mol_q, mol_q)
-    # sol_out = readout_vector_sol + sol_attn.squeeze(1)
 
     final_readout = torch.cat([readout_vector_mol, readout_vector_sol], dim=-1)
     
