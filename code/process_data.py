@@ -8,6 +8,9 @@ import numpy as np
 import os
 import sys
 
+re_generate_data = False #use this to toggle whether want to regenerate the data
+
+
 # Finds the root directory (one level up from main_script.py)
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(root_dir, 'data-wrangling'))
