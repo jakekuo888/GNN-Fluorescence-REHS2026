@@ -70,7 +70,9 @@ sol_test_loader = DataLoader(sol_test_dataset, batch_size=128, shuffle=False)
 node_features = molecules_list[0].num_node_features
 edge_features = molecules_list[0].num_edge_features
 
-model = Model(node_features, edge_features, 128, [128, 128, 128])
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+model = Model(node_features, edge_features, 128, [128, 128, 128]).to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
 criterion = torch.nn.L1Loss()
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
@@ -89,6 +91,9 @@ def train(mol_loader, sol_loader):
   model.train()
 
   for mol_data, sol_data in zip(mol_loader, sol_loader):
+    mol_data.to(device)
+    sol_data.to(device)
+
     vector_out, out = model(
       mol_data.x, mol_data.edge_index, mol_data.edge_attr, mol_data.batch,
       sol_data.x, sol_data.edge_index, sol_data.edge_attr, sol_data.batch
@@ -112,6 +117,9 @@ def test(mol_loader, sol_loader, mean, std, compute_mae=True, is_test_set=False,
   with torch.no_grad():
 
     for mol_data, sol_data in zip(mol_loader, sol_loader):
+      mol_data.to(device)
+      sol_data.to(device)
+
       vector_out, out = model(
         mol_data.x, mol_data.edge_index, mol_data.edge_attr, mol_data.batch,
         sol_data.x, sol_data.edge_index, sol_data.edge_attr, sol_data.batch

@@ -1,8 +1,8 @@
 cirpy==1.0.2
 matplotlib==3.11.0
-numpy==2.5.0
+numpy==2.4.6
 pandas==3.0.3
 rdkit==2026.3.3
-scikit_learn==1.9.0
+scikit-learn==1.9.0
 torch==2.12.1
-torch_geometric==2.8.0
+torch-geometric==2.8.0
