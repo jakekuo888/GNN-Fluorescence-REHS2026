@@ -45,27 +45,6 @@ collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 #EASY CONTROLS ^^^
 
-# ext_mol_loader = DataLoader(test_molecules_list, batch_size=256, shuffle=False)
-# ext_sol_loader = DataLoader(test_solvents_list, batch_size=256, shuffle=False)
-
-# # Split intro 3 datasets: the real training dataset for the supercomputer, and the sample train/test datasets for testing the initial model
-# mol_train_dataset, mol_split_dataset, sol_train_dataset, sol_split_dataset = train_test_split(
-#     molecules_list, solvents_list, test_size=0.2, random_state=42
-# )
-
-# mol_validate_dataset, mol_test_dataset, sol_validate_dataset, sol_test_dataset = train_test_split(
-#     mol_split_dataset, sol_split_dataset, test_size=0.5, random_state=42
-# )
-
-# # Data Loaders for each of the three for molecules and solvents
-# mol_train_loader = DataLoader(mol_train_dataset, batch_size=64, shuffle=False)
-# mol_validate_loader = DataLoader(mol_validate_dataset, batch_size=64, shuffle=False)
-# mol_test_loader = DataLoader(mol_test_dataset, batch_size=128, shuffle=False)
-
-# sol_train_loader = DataLoader(sol_train_dataset, batch_size=64, shuffle=False)
-# sol_validate_loader = DataLoader(sol_validate_dataset, batch_size=64, shuffle=False)
-# sol_test_loader = DataLoader(sol_test_dataset, batch_size=128, shuffle=False)
-
 ext_loader = DataLoader(test_molecules_list, batch_size=256, shuffle=True)
 
 train_dataset, split_dataset = train_test_split(molecules_list, test_size=0.2, random_state=42)
@@ -81,7 +60,6 @@ edge_features = molecules_list[0].num_edge_features
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# model = Model(node_features, edge_features, 128, [128, 128, 128]).to(device)
 model = ModelTwo(node_features, edge_features, 128, train_solv_features, [128, 128, 128], [128, 128, 128])
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
 criterion = torch.nn.L1Loss()

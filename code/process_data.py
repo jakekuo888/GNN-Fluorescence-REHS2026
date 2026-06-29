@@ -49,12 +49,6 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
     edge_features = molecules_list[0].num_edge_features
     solv_features = solvents_list[0].size
 
-    # for sol in solvents_list:
-    #     if sol.edge_attr.dim() == 1 and sol.edge_attr.shape[0] == 0:
-    #         sol.edge_attr = torch.zeros((0, edge_features), dtype=torch.float)
-    #     if sol.edge_index.dim() == 1 and sol.edge_index.shape[0] == 0:
-    #         sol.edge_index = torch.zeros((2, 0), dtype=torch.long)
-
     # Fill the y-label list with the fluorescence times
     with open(f'./data/{chosen_option.out_folder}/{chosen_option.out_file}', 'r') as f:
         y_labels = [float(line) for line in f.read().splitlines() if line.strip()]
