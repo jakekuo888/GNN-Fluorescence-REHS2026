@@ -20,6 +20,14 @@ from process_data import test_molecules_list, test_y_mean, test_y_std, train_smi
 
 from process_data import absorption_data, PredOption, generate_graphs_labels
 
+
+#EASY CONTROLS vvv
+n_epochs = 100
+collect_data = True
+early_stopper = EarlyStop(9, 0.005)
+#EASY CONTROLS ^^^
+
+
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(root_dir, 'data-wrangling'))
 sys.path.append(os.path.join(root_dir, 'plots-visuals'))
@@ -38,12 +46,6 @@ if re_generate_data:
   
 molecules_list, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(absorption_data[0])
 test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(absorption_data[1], y_mean=y_mean, y_std=y_std, normalize=False)
-
-#EASY CONTROLS vvv
-n_epochs = 100
-collect_data = True
-early_stopper = EarlyStop(9, 0.005)
-#EASY CONTROLS ^^^
 
 ext_loader = DataLoader(test_molecules_list, batch_size=256, shuffle=True)
 
@@ -177,5 +179,5 @@ if(collect_data):
 
     print("Creating scatterplot of the error vs similarity (smiles) \n ...")
     plot_smiles_similarity_loss_graph(train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)
-    
-    print("DONE")
+
+print("PROCESS DONE")
