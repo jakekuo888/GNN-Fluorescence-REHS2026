@@ -1,6 +1,7 @@
 import torch
 from torch_geometric.data import Data
 from rdkit import Chem
+from rdkit.Chem import rdFingerprintGenerator
 from rdkit.Chem import rdPartialCharges
 import numpy as np
 import cirpy
@@ -134,3 +135,11 @@ def smiles_to_graph(smiles):
   data = Data(x=x, edge_index=edge_indices, edge_attr=edge_attrs)
 
   return data
+
+def smiles_to_morgan_fp(fp_gen, smiles):
+	mol = Chem.MolFromSmiles(smiles)
+	bit_vect = fp_gen.GetFingerprint(mol)
+	fp_array = np.zeros((2048,), dtype=np.int8)
+	Chem.DataStructs.ConvertToNumpyArray(bit_vect, fp_array)
+
+	return fp_array

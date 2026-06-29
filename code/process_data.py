@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
+import numpy as np
 
 import os
 import sys
@@ -37,15 +38,17 @@ absorption_data = [d4c_absorption, qmwf_absorption]
 def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=True):
     # Load the lists of Data (graph) objects to process
     molecules_list = torch.load(f'./data/{chosen_option.out_folder}/molecularGraphs-{chosen_option.dataset}.pt', weights_only=False) # list of PyG Data objects
-    solvents_list = torch.load(f'./data/{chosen_option.out_folder}/solventGraphs-{chosen_option.dataset}.pt', weights_only=False)
+    # solvents_list = torch.load(f'./data/{chosen_option.out_folder}/solventGraphs-{chosen_option.dataset}.pt', weights_only=False)
+    solvent_fps = np.load(f'./data/{chosen_option.out_folder}/solventFingerprints-{chosen_option.dataset}.pt')
+    solvents_list = [row for row in solvent_fps]
 
     edge_features = molecules_list[0].num_edge_features
 
-    for sol in solvents_list:
-        if sol.edge_attr.dim() == 1 and sol.edge_attr.shape[0] == 0:
-            sol.edge_attr = torch.zeros((0, edge_features), dtype=torch.float)
-        if sol.edge_index.dim() == 1 and sol.edge_index.shape[0] == 0:
-            sol.edge_index = torch.zeros((2, 0), dtype=torch.long)
+    # for sol in solvents_list:
+    #     if sol.edge_attr.dim() == 1 and sol.edge_attr.shape[0] == 0:
+    #         sol.edge_attr = torch.zeros((0, edge_features), dtype=torch.float)
+    #     if sol.edge_index.dim() == 1 and sol.edge_index.shape[0] == 0:
+    #         sol.edge_index = torch.zeros((2, 0), dtype=torch.long)
 
     # Fill the y-label list with the fluorescence times
     with open(f'./data/{chosen_option.out_folder}/{chosen_option.out_file}', 'r') as f:
@@ -59,7 +62,7 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
 
     # filter molecules and solvents to match
     molecules_list = [mol for mol, valid in zip(molecules_list, valid_mask) if valid]
-    solvents_list = [sol for sol, valid in zip(solvents_list, valid_mask) if valid]
+    # solvents_list = [sol for sol, valid in zip(solvents_list, valid_mask) if valid]
 
     # Z-Score Standardization to fix Large Data Scale
     y_log = torch.log(y_tensor)
@@ -74,12 +77,15 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
     for data, label in zip(molecules_list, y_normalized):
         data.y = label.view(-1, 1) # View(-1,1) returns size [1,1] because y_normalized is a tensor
 
+    for data, fp in zip(molecules_list, solvents_list):
+        data.sol_fp = fp
+
     smiles_for_similarity = []
 
     for data in molecules_list:
         smiles_for_similarity.append(data.smiles)
 
-    return molecules_list, solvents_list, y_mean, y_std, smiles_for_similarity
+    return molecules_list, y_mean, y_std, smiles_for_similarity
 
 
 # TEST CODE MAINLY
@@ -90,11 +96,11 @@ chosen_option = d4c_absorption
 if re_generate_data:
     generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
 
-train_molecules_list, train_solvents_list, train_y_mean, train_y_std, train_smiles_for_similarity = generate_graphs_labels(chosen_option)
+train_molecules_list, train_y_mean, train_y_std, train_smiles_for_similarity = generate_graphs_labels(chosen_option)
 
 chosen_option = qmwf_absorption
 
 if re_generate_data:
     generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
 
-test_molecules_list, test_solvents_list, test_y_mean, test_y_std, test_smiles_for_similarity = generate_graphs_labels(chosen_option, y_mean=train_y_mean, y_std=train_y_std, normalize=False)
+test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity = generate_graphs_labels(chosen_option, y_mean=train_y_mean, y_std=train_y_std, normalize=False)
