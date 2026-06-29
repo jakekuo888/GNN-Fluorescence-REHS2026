@@ -82,7 +82,7 @@ edge_features = molecules_list[0].num_edge_features
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # model = Model(node_features, edge_features, 128, [128, 128, 128]).to(device)
-model = ModelTwo(node_features, edge_features, 128, train_solv_features, [128, 128, 128], [128, 128, 128])
+model = ModelTwo(node_features, edge_features, 128, train_solv_features, [128, 128, 128], [128, 128, 128]).to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
 criterion = torch.nn.L1Loss()
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
