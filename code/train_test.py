@@ -8,14 +8,14 @@ from sklearn.model_selection import train_test_split
 import sys
 import os
 
-from neural_networks import Model
+from neural_networks import ModelTwo
 from early_stop import EarlyStop
 
 from process_data import train_molecules_list as molecules_list
 from process_data import train_y_mean as y_mean
 from process_data import train_y_std as y_std
 
-from process_data import test_molecules_list, test_y_mean, test_y_std, train_smiles_for_similarity, test_smiles_for_similarity
+from process_data import test_molecules_list, test_y_mean, test_y_std, train_smiles_for_similarity, test_smiles_for_similarity, train_solv_features, test_solv_features
 
 from process_data import absorption_data, PredOption, generate_graphs_labels
 
@@ -35,8 +35,8 @@ if re_generate_data:
   chosen_option = absorption_data[1]
   generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
   
-molecules_list, y_mean, y_std, train_smiles_for_similarity = generate_graphs_labels(absorption_data[0])
-test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity = generate_graphs_labels(absorption_data[1], y_mean=y_mean, y_std=y_std, normalize=False)
+molecules_list, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(absorption_data[0])
+test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(absorption_data[1], y_mean=y_mean, y_std=y_std, normalize=False)
 
 #EASY CONTROLS vvv
 n_epochs = 100
@@ -80,7 +80,8 @@ edge_features = molecules_list[0].num_edge_features
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = Model(node_features, edge_features, 128, [128, 128, 128]).to(device)
+# model = Model(node_features, edge_features, 128, [128, 128, 128]).to(device)
+model = ModelTwo(node_features, edge_features, 128, train_solv_features, [128, 128, 128], [128, 128, 128])
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
 criterion = torch.nn.L1Loss()
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)

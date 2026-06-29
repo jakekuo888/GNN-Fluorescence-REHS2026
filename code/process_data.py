@@ -43,6 +43,7 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
     solvents_list = [row for row in solvent_fps]
 
     edge_features = molecules_list[0].num_edge_features
+    solv_features = solvents_list[0].size
 
     # for sol in solvents_list:
     #     if sol.edge_attr.dim() == 1 and sol.edge_attr.shape[0] == 0:
@@ -85,7 +86,7 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
     for data in molecules_list:
         smiles_for_similarity.append(data.smiles)
 
-    return molecules_list, y_mean, y_std, smiles_for_similarity
+    return molecules_list, y_mean, y_std, smiles_for_similarity, solv_features
 
 
 # TEST CODE MAINLY
@@ -96,11 +97,11 @@ chosen_option = d4c_absorption
 if re_generate_data:
     generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
 
-train_molecules_list, train_y_mean, train_y_std, train_smiles_for_similarity = generate_graphs_labels(chosen_option)
+train_molecules_list, train_y_mean, train_y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(chosen_option)
 
 chosen_option = qmwf_absorption
 
 if re_generate_data:
     generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
 
-test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity = generate_graphs_labels(chosen_option, y_mean=train_y_mean, y_std=train_y_std, normalize=False)
+test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(chosen_option, y_mean=train_y_mean, y_std=train_y_std, normalize=False)
