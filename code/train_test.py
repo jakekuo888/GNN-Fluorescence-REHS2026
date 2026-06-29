@@ -12,32 +12,18 @@ import os
 from neural_networks import ModelTwo
 from early_stop import EarlyStop
 
-from process_data import train_molecules_list as molecules_list
-from process_data import train_y_mean as y_mean
-from process_data import train_y_std as y_std
-
-from process_data import test_molecules_list, test_y_mean, test_y_std, train_smiles_for_similarity, test_smiles_for_similarity, train_solv_features, test_solv_features
-
-from process_data import absorption_data, PredOption, generate_graphs_labels
+from process_data import absorption_data_options, PredOption, generate_graphs_labels
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(root_dir, 'data-wrangling'))
 sys.path.append(os.path.join(root_dir, 'plots-visuals'))
 
 from plot_similarity_error import plot_vector_similarity_loss_graph, plot_smiles_similarity_loss_graph
-from data_conversion import generate_and_export_data
 
 re_generate_data = False
 
-if re_generate_data:
-  chosen_option = absorption_data[0]
-  generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
-  
-  chosen_option = absorption_data[1]
-  generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
-  
-molecules_list, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(absorption_data[0])
-test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(absorption_data[1], y_mean=y_mean, y_std=y_std, normalize=False)
+molecules_list, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(absorption_data_options[0], generate_data=re_generate_data)
+test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(absorption_data_options[1], generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
 
 #EASY CONTROLS vvv
 n_epochs = 100

@@ -33,9 +33,12 @@ d4c_lifetime = PredOption("d4c", "Lifetime (ns)", "lifetime-data", "lifetime-d4c
 d4c_absorption = PredOption("d4c", "Absorption max (nm)", "absorption-data", "absorption-d4c.txt")
 qmwf_absorption = PredOption("qmwf", "lambda_max (Exp nm)", "absorption-data", "absorption-qmwf.txt")
 
-absorption_data = [d4c_absorption, qmwf_absorption]
+absorption_data_options = [d4c_absorption, qmwf_absorption]
 
-def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=True):
+def generate_graphs_labels(chosen_option, generate_data=False, y_mean=None, y_std=None, normalize=True):
+    if generate_data:
+        generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
+
     # Load the lists of Data (graph) objects to process
     molecules_list = torch.load(f'./data/{chosen_option.out_folder}/molecularGraphs-{chosen_option.dataset}.pt', weights_only=False) # list of PyG Data objects
     # solvents_list = torch.load(f'./data/{chosen_option.out_folder}/solventGraphs-{chosen_option.dataset}.pt', weights_only=False)
@@ -85,21 +88,3 @@ def generate_graphs_labels(chosen_option, y_mean=None, y_std=None, normalize=Tru
         smiles_for_similarity.append(data.smiles)
 
     return molecules_list, y_mean, y_std, smiles_for_similarity, solv_features
-
-
-# TEST CODE MAINLY
-re_generate_data = False
-
-chosen_option = d4c_absorption
-
-if re_generate_data:
-    generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
-
-train_molecules_list, train_y_mean, train_y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(chosen_option)
-
-chosen_option = qmwf_absorption
-
-if re_generate_data:
-    generate_and_export_data(chosen_option.dataset, chosen_option.mol_label, chosen_option.sol_label, chosen_option.pred_label, chosen_option.out_folder, chosen_option.out_file)
-
-test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(chosen_option, y_mean=train_y_mean, y_std=train_y_std, normalize=False)
