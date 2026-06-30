@@ -123,14 +123,14 @@ def test(model, loader, mean, std, compute_mae=True, is_test_set=False, collect_
   else:
     return 0.0
 
-def run_model(model, idx):
+def run_model(model, train_loader, val_loader, idx):
   # Train & Test the Model
   with open(f"./data/plot-data/loss-model-{idx}.txt", "w") as f_:
     for epoch in range(1,n_epochs+1):
       train(model, train_loader)
 
       train_avg_mae = test(model, train_loader, y_mean, y_std)
-      sample_avg_mae = test(model, validate_loader, y_mean, y_std)
+      sample_avg_mae = test(model, val_loader, y_mean, y_std)
       scheduler.step(float(sample_avg_mae))
 
       if early_stopper.stop_early(sample_avg_mae, model):
@@ -141,26 +141,20 @@ def run_model(model, idx):
       print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {sample_avg_mae:.4f} | Early stopper count: {early_stopper.count}")
       if(collect_data): print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_) #loading data for plotting (train, test)
 
-def test_model(model, idx):
+def test_model(model, test_loader, idx):
   test_avg_mae = test(model, test_loader, y_mean, y_std, compute_mae=True)
   print(f"TEST AVERAGE MAE FOR MODEL #{idx} (FINAL RESULTS): {test_avg_mae}")
 
 for idx in range(len(models)):
   print(f"\n---------------------------------------- MODEL #{idx} RUNNING NOW ----------------------------------------")
-  run_model(models[idx][0], idx)
+  run_model(models[idx][0], train_loader, validate_loader, idx)
 
 print("UNDERGOING TESTING")
 print("-" * 45)
 for idx in range(len(models)):
-  test_model(models[idx][0], idx)
-
-  print("TESTING ON EXTERNAL QMWF DATASET")
-  external_avg_mae = test(model, ext_loader, test_y_mean, test_y_std, compute_mae=True, is_test_set=True, collect_plot_data=True)
-  print("-" * 45)
-  print(f"EXTERNAL AVERAGE MAE FOR MODEL #{idx} (FINAL RESULTS): {external_avg_mae}")
-  print("-" * 45)
-
-# train_avg_mse = test(train_loader, y_mean, y_std, compute_mae=False, collect_plot_data=True)
+  test_model(models[idx][0], test_loader, idx)
+  torch.save(models[idx][0].state_dict(), f"./models/model_{idx}_weights.pth")
+  models[idx][1] = f"./models/model_{idx}_weights.pth"
 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
