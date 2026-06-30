@@ -4,7 +4,7 @@ import sys
 import subprocess
 import torch.nn as nn
 from torch_geometric.loader import DataLoader
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 
 import sys
 import os
@@ -33,12 +33,29 @@ test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity, test_s
 
 ext_loader = DataLoader(test_molecules_list, batch_size=256, shuffle=True)
 
-train_dataset, split_dataset = train_test_split(molecules_list, test_size=0.2, random_state=42)
-test_dataset, validate_dataset = train_test_split(split_dataset, test_size=0.5, random_state=42)
+kf = KFold(n_splits=10, shuffle=True, random_state=42)
+folds = list(kf.split(molecules_list))
 
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-validate_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
-test_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
+train_loaders = []
+test_loaders = []
+validate_loaders =[]
+
+for i in range(9):
+  test_fold_idx = i
+  val_fold_idx = (i + 1) % 10
+  train_folds_indices = [j for j in range(10) if j != test_fold_idx and j != val_fold_idx]
+
+  test_indices = folds[test_fold_idx][1]
+  val_indices = folds[val_fold_idx][1]
+  train_indices = np.concatenate([folds[j][1] for j in train_folds_indices])
+    
+  train_dataset = molecules_list[train_indices]
+  test_dataset = molecules_list[test_indices]
+  validate_dataset = molecules_list[val_indices]
+
+  train_loaders.append(DataLoader(train_dataset, batch_size=64, shuffle=True))
+  validate_loaders.append(DataLoader(validate_dataset, batch_size=128, shuffle=True))
+  test_loaders.append(DataLoader(test_dataset, batch_size=128, shuffle=True))
 
 # Set up the Model class (GNN/FFNN), AdamW optimizer, and MAE Loss function
 node_features = molecules_list[0].num_node_features
@@ -147,12 +164,12 @@ def test_model(model, test_loader, idx):
 
 for idx in range(len(models)):
   print(f"\n---------------------------------------- MODEL #{idx} RUNNING NOW ----------------------------------------")
-  run_model(models[idx][0], train_loader, validate_loader, idx)
+  run_model(models[idx][0], train_loaders[idx], validate_loaders[idx], idx)
 
 print("UNDERGOING TESTING")
 print("-" * 45)
 for idx in range(len(models)):
-  test_model(models[idx][0], test_loader, idx)
+  test_model(models[idx][0], test_loaders[idx], idx)
   torch.save(models[idx][0].state_dict(), f"./models/model_{idx}_weights.pth")
   models[idx][1] = f"./models/model_{idx}_weights.pth"
 
