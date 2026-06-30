@@ -46,13 +46,18 @@ edge_features = molecules_list[0].num_edge_features
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = ModelTwo(node_features, edge_features, 128, train_solv_features, [128, 128, 128], [128, 128, 128]).to(device)
+models = []
+
+for i in range(9):
+  model = ModelTwo(node_features, edge_features, 128, train_solv_features, [128, 128, 128], [128, 128, 128]).to(device)
+  models.append([model])
+
 optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
 criterion = torch.nn.L1Loss()
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
 # Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
-def train(loader):
+def train(model, loader):
   model.train()
 
   for data in loader:
@@ -72,7 +77,7 @@ test_vectors_for_similarity = []
 test_losses_for_similarity = []
 
 # Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MAE output)
-def test(loader, mean, std, compute_mae=True, is_test_set=False, collect_plot_data=False):
+def test(model, loader, mean, std, compute_mae=True, is_test_set=False, collect_plot_data=False):
   model.eval()
 
   total_mae = 0.0
@@ -118,36 +123,44 @@ def test(loader, mean, std, compute_mae=True, is_test_set=False, collect_plot_da
   else:
     return 0.0
 
-# Train & Test the Model
-with open("./data/plot-data/loss.txt", "w") as f_:
-  for epoch in range(1,n_epochs+1):
-    train(train_loader)
+def run_model(model, idx):
+  # Train & Test the Model
+  with open(f"./data/plot-data/loss-model-{idx}.txt", "w") as f_:
+    for epoch in range(1,n_epochs+1):
+      train(model, train_loader)
 
-    train_avg_mae = test(train_loader, y_mean, y_std)
-    sample_avg_mae = test(validate_loader, y_mean, y_std)
-    scheduler.step(float(sample_avg_mae))
+      train_avg_mae = test(model, train_loader, y_mean, y_std)
+      sample_avg_mae = test(model, validate_loader, y_mean, y_std)
+      scheduler.step(float(sample_avg_mae))
 
-    if early_stopper.stop_early(sample_avg_mae, model):
-      print(f'Early stop has been initiated on Epoch #{epoch}')
-      early_stopper.restore_best(model)
-      break
+      if early_stopper.stop_early(sample_avg_mae, model):
+        print(f'Early stop has been initiated on Epoch #{epoch}')
+        early_stopper.restore_best(model)
+        break
 
-    print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {sample_avg_mae:.4f} | Early stopper count: {early_stopper.count}")
-    if(collect_data): print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_) #loading data for plotting (train, test)
+      print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {sample_avg_mae:.4f} | Early stopper count: {early_stopper.count}")
+      if(collect_data): print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_) #loading data for plotting (train, test)
+
+def test_model(model, idx):
+  test_avg_mae = test(model, test_loader, y_mean, y_std, compute_mae=True)
+  print(f"TEST AVERAGE MAE FOR MODEL #{idx} (FINAL RESULTS): {test_avg_mae}")
+
+for idx in range(len(models)):
+  print(f"\n---------------------------------------- MODEL #{idx} RUNNING NOW ----------------------------------------")
+  run_model(models[idx][0], idx)
 
 print("UNDERGOING TESTING")
 print("-" * 45)
-test_avg_mae = test(test_loader, y_mean, y_std, compute_mae=True)
-print(f"TEST AVERAGE MAE (FINAL RESULTS): {test_avg_mae}")
-print("-" * 45)
+for idx in range(len(models)):
+  test_model(models[idx][0], idx)
 
-print("TESTING ON EXTERNAL QMWF DATASET")
-external_avg_mae = test(ext_loader, test_y_mean, test_y_std, compute_mae=True, is_test_set=True, collect_plot_data=True)
-print("-" * 45)
-print(f"EXTERNAL AVERAGE MAE (FINAL RESULTS): {external_avg_mae}")
-print("-" * 45)
+  print("TESTING ON EXTERNAL QMWF DATASET")
+  external_avg_mae = test(model, ext_loader, test_y_mean, test_y_std, compute_mae=True, is_test_set=True, collect_plot_data=True)
+  print("-" * 45)
+  print(f"EXTERNAL AVERAGE MAE FOR MODEL #{idx} (FINAL RESULTS): {external_avg_mae}")
+  print("-" * 45)
 
-train_avg_mse = test(train_loader, y_mean, y_std, compute_mae=False, collect_plot_data=True)
+# train_avg_mse = test(train_loader, y_mean, y_std, compute_mae=False, collect_plot_data=True)
 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
