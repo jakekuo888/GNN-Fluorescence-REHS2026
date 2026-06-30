@@ -66,6 +66,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 models = []
 optimizers = []
 schedulers = []
+stoppers = []
 
 for i in range(9):
   model = ModelTwo(node_features, edge_features, 128, train_solv_features, [128, 128, 128], [128, 128, 128]).to(device)
@@ -76,6 +77,7 @@ for i in range(9):
   models.append([model])
   optimizers.append(optimizer)
   schedulers.append(scheduler)
+  stoppers.append(EarlyStop(9, 0.005))
 
 criterion = torch.nn.L1Loss()
 
@@ -156,12 +158,12 @@ def run_model(model, train_loader, val_loader, opt, sched, idx):
       sample_avg_mae = test(model, val_loader, y_mean, y_std)
       sched.step(float(sample_avg_mae))
 
-      if early_stopper.stop_early(sample_avg_mae, model):
+      if stoppers[idx].stop_early(sample_avg_mae, model):
         print(f'Early stop has been initiated on Epoch #{epoch}')
-        early_stopper.restore_best(model)
+        stoppers[idx].restore_best(model)
         break
 
-      print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {sample_avg_mae:.4f} | Early stopper count: {early_stopper.count}")
+      print(f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {sample_avg_mae:.4f} | Early stopper count: {stoppers[idx].count}")
       if(collect_data): print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_) #loading data for plotting (train, test)
 
 def test_model(model, test_loader, idx):
@@ -177,7 +179,7 @@ print("-" * 45)
 for idx in range(len(models)):
   test_model(models[idx][0], test_loaders[idx], idx)
   torch.save(models[idx][0].state_dict(), f"./models/model_{idx}_weights.pth")
-  models[idx][1] = f"./models/model_{idx}_weights.pth"
+  models[idx].append(f"./models/model_{idx}_weights.pth")
 
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
