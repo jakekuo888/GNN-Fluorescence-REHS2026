@@ -50,8 +50,8 @@ for i in range(9):
   train_indices = np.concatenate([folds[j][1] for j in train_folds_indices])
 
   train_dataset = [molecules_list[idx] for idx in train_indices]
-  validate_dataset = [molecules_list[idx] for idx in test_indices]
-  test_dataset = [molecules_list[idx] for idx in val_indices]
+  validate_dataset = [molecules_list[idx] for idx in val_indices]
+  test_dataset = [molecules_list[idx] for idx in test_indices]
 
   train_loaders.append(DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True))
   validate_loaders.append(DataLoader(validate_dataset, batch_size=128, shuffle=True))
