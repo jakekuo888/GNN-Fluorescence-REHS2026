@@ -36,6 +36,8 @@ ext_loader = DataLoader(test_molecules_list, batch_size=256, shuffle=True)
 kf = KFold(n_splits=10, shuffle=True, random_state=42)
 folds = list(kf.split(molecules_list))
 
+molecules_array = np.array(molecules_list)
+
 train_loaders = []
 test_loaders = []
 validate_loaders =[]
@@ -49,9 +51,9 @@ for i in range(9):
   val_indices = folds[val_fold_idx][1]
   train_indices = np.concatenate([folds[j][1] for j in train_folds_indices])
     
-  train_dataset = molecules_list[train_indices]
-  test_dataset = molecules_list[test_indices]
-  validate_dataset = molecules_list[val_indices]
+  train_dataset = molecules_array[train_indices].tolist()
+  validate_dataset = molecules_array[test_indices].tolist()
+  test_dataset = molecules_array[val_indices].tolist()
 
   train_loaders.append(DataLoader(train_dataset, batch_size=64, shuffle=True))
   validate_loaders.append(DataLoader(validate_dataset, batch_size=128, shuffle=True))
