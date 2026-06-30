@@ -53,7 +53,7 @@ for i in range(9):
   validate_dataset = [molecules_list[idx] for idx in test_indices]
   test_dataset = [molecules_list[idx] for idx in val_indices]
 
-  train_loaders.append(DataLoader(train_dataset, batch_size=64, shuffle=True))
+  train_loaders.append(DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True))
   validate_loaders.append(DataLoader(validate_dataset, batch_size=128, shuffle=True))
   test_loaders.append(DataLoader(test_dataset, batch_size=128, shuffle=True))
 
@@ -74,7 +74,7 @@ for i in range(9):
   scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
   
   #appending to lists
-  models.append([model])
+  models.append([model, ""])
   optimizers.append(optimizer)
   schedulers.append(scheduler)
   stoppers.append(EarlyStop(9, 0.005))
