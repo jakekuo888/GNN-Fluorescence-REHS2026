@@ -48,12 +48,12 @@ for i in range(9):
   test_indices = folds[test_fold_idx][1]
   val_indices = folds[val_fold_idx][1]
   train_indices = np.concatenate([folds[j][1] for j in train_folds_indices])
+    
+  train_dataset = molecules_list[train_indices]
+  test_dataset = molecules_list[test_indices]
+  validate_dataset = molecules_list[val_indices]
 
-  train_dataset = [molecules_list[idx] for idx in train_indices]
-  test_dataset = [molecules_list[idx] for idx in test_indices]
-  validate_dataset = [molecules_list[idx] for idx in val_indices]
-
-  train_loaders.append(DataLoader(train_dataset, batch_size=64, shuffle=True, drop_last=True))
+  train_loaders.append(DataLoader(train_dataset, batch_size=64, shuffle=True))
   validate_loaders.append(DataLoader(validate_dataset, batch_size=128, shuffle=True))
   test_loaders.append(DataLoader(test_dataset, batch_size=128, shuffle=True))
 
@@ -64,17 +64,23 @@ edge_features = molecules_list[0].num_edge_features
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 models = []
+optimizers = []
+schedulers = []
 
 for i in range(9):
   model = ModelTwo(node_features, edge_features, 128, train_solv_features, [128, 128, 128], [128, 128, 128]).to(device)
+  optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
+  scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+  
+  #appending to lists
   models.append([model])
+  optimizers.append(optimizer)
+  schedulers.append(scheduler)
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
 criterion = torch.nn.L1Loss()
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
 
 # Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
-def train(model, loader):
+def train(model, opt, loader):
   model.train()
 
   for data in loader:
@@ -85,9 +91,9 @@ def train(model, loader):
       data.x, data.edge_index, data.edge_attr, data.batch, sol_fp
     )
     loss = criterion(out, data.y.view(-1,1))
-    optimizer.zero_grad()
+    opt.zero_grad()
     loss.backward()
-    optimizer.step()
+    opt.step()
 
 train_vectors_for_similarity = []
 test_vectors_for_similarity = []
@@ -140,15 +146,15 @@ def test(model, loader, mean, std, compute_mae=True, is_test_set=False, collect_
   else:
     return 0.0
 
-def run_model(model, train_loader, val_loader, idx):
+def run_model(model, train_loader, val_loader, opt, sched, idx):
   # Train & Test the Model
   with open(f"./data/plot-data/loss-model-{idx}.txt", "w") as f_:
     for epoch in range(1,n_epochs+1):
-      train(model, train_loader)
+      train(model, opt, train_loader)
 
       train_avg_mae = test(model, train_loader, y_mean, y_std)
       sample_avg_mae = test(model, val_loader, y_mean, y_std)
-      scheduler.step(float(sample_avg_mae))
+      sched.step(float(sample_avg_mae))
 
       if early_stopper.stop_early(sample_avg_mae, model):
         print(f'Early stop has been initiated on Epoch #{epoch}')
@@ -164,7 +170,7 @@ def test_model(model, test_loader, idx):
 
 for idx in range(len(models)):
   print(f"\n---------------------------------------- MODEL #{idx} RUNNING NOW ----------------------------------------")
-  run_model(models[idx][0], train_loaders[idx], validate_loaders[idx], idx)
+  run_model(models[idx][0], train_loaders[idx], validate_loaders[idx], optimizers[idx], schedulers[idx], idx)
 
 print("UNDERGOING TESTING")
 print("-" * 45)
