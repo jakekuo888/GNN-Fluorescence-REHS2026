@@ -176,11 +176,14 @@ for idx in range(len(models)):
 
 print("UNDERGOING TESTING")
 print("-" * 45)
+
 for idx in range(len(models)):
   test_model(models[idx][0], test_loaders[idx], idx)
   torch.save(models[idx][0].state_dict(), f"./models/model_{idx}_weights.pth")
   models[idx].append(f"./models/model_{idx}_weights.pth")
 
+
+#visuals
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
   if(want_visuals == 'y'):
