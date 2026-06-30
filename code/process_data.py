@@ -90,3 +90,8 @@ def generate_graphs_labels(chosen_option, generate_data=False, y_mean=None, y_st
         smiles_for_similarity.append(data.smiles)
 
     return molecules_list, y_mean, y_std, smiles_for_similarity, solv_features
+
+
+if re_generate_data:
+    for option in absorption_data_options:
+        generate_graphs_labels(option, generate_data=True)

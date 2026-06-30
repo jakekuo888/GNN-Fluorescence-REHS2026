@@ -15,7 +15,7 @@ from early_stop import EarlyStop
 from process_data import absorption_data_options, PredOption, generate_graphs_labels
 
 #EASY CONTROLS vvv
-n_epochs = 100
+n_epochs = 1
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 #EASY CONTROLS ^^^
@@ -170,6 +170,10 @@ def test_model(model, test_loader, idx):
   test_avg_mae = test(model, test_loader, y_mean, y_std, compute_mae=True)
   print(f"TEST AVERAGE MAE FOR MODEL #{idx} (FINAL RESULTS): {test_avg_mae}")
 
+  with open("./models/information.txt", "w") as f_:
+    print(f"TEST AVERAGE MAE FOR MODEL #{idx} (FINAL RESULTS): {test_avg_mae}", file=f_)
+
+
 for idx in range(len(models)):
   print(f"\n---------------------------------------- MODEL #{idx} RUNNING NOW ----------------------------------------")
   run_model(models[idx][0], train_loaders[idx], validate_loaders[idx], optimizers[idx], schedulers[idx], idx)
@@ -186,6 +190,9 @@ for idx in range(len(models)):
 #visuals
 if(collect_data):
   want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
+  print("Visuals not available currently.")
+  """
+  this is kind of broken currently, will try graphing when it is possible (later)
   if(want_visuals == 'y'):
 
     print("Creating plotting loss visuals \n ...")
@@ -198,5 +205,5 @@ if(collect_data):
 
     print("Creating scatterplot of the error vs similarity (smiles) \n ...")
     plot_smiles_similarity_loss_graph(train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)
-
+"""
 print("PROCESS DONE")
