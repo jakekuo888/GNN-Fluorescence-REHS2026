@@ -7,8 +7,10 @@ import os
 import sys
 
 
-def returnFragments(mol):
+def getBonds(mol):
 	#Make sure that you input as struct && !smiles
+	canBreak = []
+
 	fragment_mol = Chem.GetMolFrags(mol, asMols = True)
 	return fragment_mol
 
@@ -16,6 +18,9 @@ def removeFragments(smiles, amount = -1):
 	mol = Chem.MolFromSmiles(smiles)
 	mol = Chem.AddHs(mol)
 
+	AllChem.EmbedMolecule(mol, AllChem.ETKDG())
+
+	"""
 	fmol = returnFragments(mol)
 	
 	if amount == -1:
@@ -24,6 +29,7 @@ def removeFragments(smiles, amount = -1):
 		n_frag = amount
 
 	results = []
+	"""
 
 	#turn each of the fragments as a vector embedding
 	#find a way to connect them back as a graph of vector embeddings
