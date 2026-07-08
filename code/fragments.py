@@ -1,4 +1,7 @@
 from rdkit import Chem
+from rdkit.Chem import AllChem
+from rdkit.Chem import rdDistGeom
+
 import numpy as np
 import os 
 import sys
@@ -11,6 +14,8 @@ def returnFragments(mol):
 
 def removeFragments(smiles, amount = -1):
 	mol = Chem.MolFromSmiles(smiles)
+	mol = Chem.AddHs(mol)
+
 	fmol = returnFragments(mol)
 	
 	if amount == -1:
