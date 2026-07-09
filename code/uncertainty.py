@@ -10,10 +10,22 @@ from sklearn.model_selection import train_test_split
 import sys
 import os
 
-from neural_networks import ModelTwo
-from early_stop import EarlyStop
+from models.neural_networks import ModelTwo
+from models.early_stop import EarlyStop
 
-from train_test import node_features, edge_features, train_solv_features, ext_loader
+from setup.process_data import absorption_data_options, PredOption, generate_graphs_labels
+
+# from train_test import node_features, edge_features, train_solv_features, ext_loader
+
+re_generate_data = False
+
+molecules_list, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(absorption_data_options[0], generate_data=re_generate_data)
+test_molecules_list, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(absorption_data_options[1], generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
+
+ext_loader = DataLoader(test_molecules_list, batch_size=256, shuffle=True)
+
+node_features = molecules_list[0].num_node_features
+edge_features = molecules_list[0].num_edge_features
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -34,19 +46,20 @@ def get_model_predictions(models, loader):
   for model in models:
     model.eval()
 
-  for data in loader:
+  with torch.no_grad():
+    for data in loader:
 
-    data.to(device)
+      data.to(device)
 
-    for model in models:
-      sol_fp = torch.tensor(np.array(data.sol_fp), dtype=torch.float).to(device)
+      for model in models:
+        sol_fp = torch.tensor(np.array(data.sol_fp), dtype=torch.float).to(device)
 
-      preds_tensor = torch.stack([model(data.x, data.edge_index, data.edge_attr, data.batch, sol_fp)[1] for model in models])
+        preds_tensor = torch.stack([model(data.x, data.edge_index, data.edge_attr, data.batch, sol_fp)[1] for model in models])
 
-      preds_tensor = preds_tensor.squeeze(-1)
-      preds_numpy = preds_tensor.transpose(0, 1).cpu().numpy()
-      all_predictions.append(preds_numpy)
-      all_smiles.extend(data.smiles)
+        preds_tensor = preds_tensor.squeeze(-1)
+        preds_numpy = preds_tensor.transpose(0, 1).cpu().numpy()
+        all_predictions.append(preds_numpy)
+        all_smiles.extend(data.smiles)
 
   master_preds_array = np.vstack(all_predictions)
 
@@ -66,10 +79,12 @@ def get_uncertainties(df, num_uncertain):
 
   return most_uncertain
 
-models = get_models
+models = get_models()
 df = get_model_predictions(models, ext_loader)
 most_uncertain = get_uncertainties(df, 50)
 
+count = 1
+print("MOST UNCERTAIN SMILES:\n-------------------")
 for uncertain in most_uncertain:
-  print("MOST UNCERTAIN SMILES:\n-------------------")
-  print(most_uncertain)
+  print(f"{count}. {uncertain}")
+  count += 1
