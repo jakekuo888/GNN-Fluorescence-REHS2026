@@ -6,10 +6,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from egnn_pytorch import EGNN as EGNNLayer
-<< << << < HEAD
-
-== == == =
->>>>>> > 013bd0d6c8ed9e1a582275c5c80a247a4f17ed16
 
 
 class FragEGNN(nn.Module):
