@@ -1,9 +1,15 @@
+from torch_geometric.utils import to_dense_adj
+from torch_geometric.utils import to_dense_batch
+from torch_geometric.nn import global_mean_pool
+from torch_geometric.utils import to_dense_batch, to_dense_adj
 import numpy as np
 import torch
 import torch.nn as nn
 from egnn_pytorch import EGNN as EGNNLayer
-from torch_geometric.utils import to_dense_batch, to_dense_adj
-from torch_geometric.nn import global_mean_pool
+<< << << < HEAD
+
+== == == =
+>>>>>> > 013bd0d6c8ed9e1a582275c5c80a247a4f17ed16
 
 
 class FragEGNN(nn.Module):
