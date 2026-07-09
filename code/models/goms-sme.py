@@ -19,9 +19,8 @@ class FragEGNN(nn.Module):
 			EGNNLayer (dim = node_features, edge_dim=edge_features) for _ in range(num_layers)
 		])
 
-	def forward(self, x, pos, edge_index, edge_attr, batch):
+	def forward(self, x, pos, edge_index, edge_attr):
 		#needs some preprocessing to seperate pos from x?
-
         feats, mask = to_dense_batch(x, batch)
         coors, _ = to_dense_batch(pos, batch)
 
