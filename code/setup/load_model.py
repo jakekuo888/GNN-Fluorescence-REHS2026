@@ -5,7 +5,7 @@ from torch_geometric.data import Data
 import numpy as np
 import pandas as pd
 
-from neural_networks import ModelTwo
+from models.neural_networks import ModelTwo
 #from process_data import 
 
 

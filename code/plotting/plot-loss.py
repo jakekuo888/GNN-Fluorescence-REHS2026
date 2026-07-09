@@ -20,4 +20,4 @@ plt.title(f'Absorption MAE (nm) vs Epoch ({len(train_loss)})')
 plt.xlabel('Epoch')
 plt.ylabel('Absorption MAE (nm)')
 
-plt.savefig('./plots-visuals/new-plots/NM-Difference.png')
+plt.savefig('./plots-visuals/NM-Difference.png')

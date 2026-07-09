@@ -5,16 +5,9 @@ from torch_geometric.loader import DataLoader
 from sklearn.model_selection import train_test_split
 import numpy as np
 
-import os
-import sys
-
 re_generate_data = False #use this to toggle whether want to regenerate the data
 
-# Finds the root directory (one level up from main_script.py)
-root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(os.path.join(root_dir, 'data-wrangling'))
-
-from data_conversion import generate_and_export_data
+from wrangling.data_conversion import generate_and_export_data
 
 class PredOption():
     def __init__(self, dataset, pred_label, out_folder, out_file):

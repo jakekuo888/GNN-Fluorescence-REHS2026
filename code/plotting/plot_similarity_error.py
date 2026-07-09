@@ -52,7 +52,7 @@ def plot_smiles_similarity_loss_graph(train_smiles_list, test_smiles_list, loss_
 	plt.colorbar(label='')
 	plt.xlabel('Dice Similarity')
 	plt.ylabel('MAE')
-	plt.savefig("./plots-visuals/new-plots/fp-similarity.png")
+	plt.savefig("./plots-visuals/fp-similarity.png")
 
 	plt.close()
 
@@ -68,6 +68,6 @@ def plot_vector_similarity_loss_graph(train_vec, test_vec, loss_list):
 	plt.colorbar(label='')
 	plt.xlabel('Dice Similarity')
 	plt.ylabel('MAE')
-	plt.savefig("./plots-visuals/new-plots/vec-similarity.png")
+	plt.savefig("./plots-visuals/vec-similarity.png")
 
 	plt.close()
