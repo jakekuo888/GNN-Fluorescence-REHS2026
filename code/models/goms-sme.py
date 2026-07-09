@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from egnn_pytorch import EGNN as EGNNLayer
 from torch_geometric.utils import to_dense_batch
+from torch_geometric.utils import to_dense_adj
 
 class FragEGNN(nn.Module):
 	def __init__(self, node_features, edge_features, num_layers = 3):
