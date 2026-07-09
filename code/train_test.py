@@ -11,6 +11,7 @@ import os
 
 from models.neural_networks import ModelTwo
 from models.early_stop import EarlyStop
+from models.goms_sme import FragEGNN
 
 from setup.process_data import absorption_data_options, PredOption, generate_graphs_labels
 
