@@ -7,6 +7,8 @@ from rdkit.Chem import rdDistGeom, rdForceFieldHelpers
 import numpy as np
 import cirpy
 from rdkit import rdBase
+from rdkit.Chem import BRICS, rdmolops
+from torch_geometric.utils import subgraph
 
 import json
 import os
@@ -115,6 +117,56 @@ def resolve_smiles(name, dictionary, file):
     else:
         return name
 
+def return_frags(mol, graph):
+    bonds_to_break = [b[0] for b in BRICS.FindBRICSBonds(mol)]
+    bond_indices = [mol.GetBondBetweenAtoms(i, j).GetIdx() for i, j in bonds_to_break]
+
+    frag_mol = rdmolops.FragmentOnBonds(mol, bond_indices, addDummies=False)
+    atom_groups = Chem.GetMolFrags(frag_mol, asMols=False)
+
+    fragment_graphs = []
+
+    for atom_idx_group in atom_groups:
+        subset = torch.tensor(atom_idx_group, dtype=torch.long)
+        sub_edge_index, sub_edge_attr = subgraph(
+            subset, graph.edge_index, graph.edge_attr,
+            relabel_nodes=True, num_nodes=graph.num_nodes
+        )
+        frag_data = Data(
+            x=graph.x[subset],
+            pos=graph.pos[subset],          # original global coords, untouched
+            edge_index=sub_edge_index,
+            edge_attr=sub_edge_attr,
+        )
+        fragment_graphs.append(frag_data)
+    
+    atom_to_frag = {}
+    for frag_id, atom_idx_group in enumerate(atom_groups):
+        for atom_idx in atom_idx_group:
+            atom_to_frag[atom_idx] = frag_id
+
+    gs_edges = set()
+    for atom_i, atom_j in bonds_to_break:
+        frag_a, frag_b = atom_to_frag[atom_i], atom_to_frag[atom_j]
+        gs_edges.add((min(frag_a, frag_b), max(frag_a, frag_b)))
+
+    fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+    frag_fps = [
+    fp_gen.GetFingerprint(mol=mol, fromAtoms=list(g))
+    for g in atom_groups
+    ]
+    
+    fragmentation_output = {
+        "frag_graphs": fragment_graphs,
+        "atom_groups": atom_groups,
+        "atom_to_frag_map": atom_to_frag,
+        "cut_bonds": gs_edges,
+        "frag_fps": frag_fps,
+        "entire_graph": graph
+    }
+
+    return fragmentation_output
+
 def smiles_to_graph(smiles):
   blocker = rdBase.BlockLogs()
 
@@ -170,7 +222,7 @@ def smiles_to_graph(smiles):
 
   data = Data(x=x, pos=positions, edge_index=edge_indices, edge_attr=edge_attrs)
 
-  return data
+  return return_frags(mol, data)
 
 def smiles_to_morgan_fp(fp_gen, smiles):
 	mol = Chem.MolFromSmiles(smiles)

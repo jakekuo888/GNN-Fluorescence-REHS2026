@@ -48,8 +48,10 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
         if pd.isna(row[mol_label]) or pd.isna(row[sol_label]):
             #print(f"Missing SMILES @{idx} \n SKIPPING")
             continue
-
-        mgraph = smiles_to_graph(row[mol_label])
+        
+        fragmentation_output = smiles_to_graph(row[mol_label])
+        fragmentation_output = {} if fragmentation_output is None else fragmentation_output
+        mgraph = fragmentation_output["entire_graph"]
         sol_smiles = resolve_smiles(row[sol_label], SOLVENT_SMILES, CACHE_FILE)
         #sgraph = smiles_to_graph(row[sol_label])
         if sol_smiles is None:
