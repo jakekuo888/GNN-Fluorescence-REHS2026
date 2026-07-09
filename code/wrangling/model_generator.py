@@ -3,6 +3,7 @@ from torch_geometric.data import Data
 from rdkit import Chem
 from rdkit.Chem import rdFingerprintGenerator
 from rdkit.Chem import rdPartialCharges
+from rdkit.Chem import rdDistGeom, rdForceFieldHelpers
 import numpy as np
 import cirpy
 from rdkit import rdBase
@@ -92,6 +93,7 @@ def resolve_smiles(name, dictionary, file):
         'dimethylsufoxide': 'CS(C)=O',
         # water
         'H 2 O': 'O',
+        'H2O': 'O'
     }
 
     mol = Chem.MolFromSmiles(str(name))
@@ -126,12 +128,6 @@ def smiles_to_graph(smiles):
   NUM_NODE_FEATURES = 27
   NUM_EDGE_FEATURES = 6
 
-  empty_graph = Data(
-            x=torch.zeros((1, NUM_NODE_FEATURES), dtype=torch.float),
-            edge_index=torch.zeros((2, 0), dtype=torch.long),
-            edge_attr=torch.zeros((0, NUM_EDGE_FEATURES), dtype=torch.float)
-  )
-
   mol = Chem.MolFromSmiles(str(smiles))
   if mol is None:
       resolved = resolve_smiles(str(smiles), SOLVENT_SMILES, CACHE_FILE)
@@ -142,6 +138,11 @@ def smiles_to_graph(smiles):
           return None
 
   mol = Chem.AddHs(mol)
+  rdDistGeom.EmbedMolecule(mol)
+  rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
+
+  conf = mol.GetConformer()
+  positions = conf.GetPositions()
 
   rdPartialCharges.ComputeGasteigerCharges(mol)
   
@@ -167,7 +168,7 @@ def smiles_to_graph(smiles):
   edge_indices = torch.tensor(bond_indices, dtype=torch.long).t().contiguous()
   edge_attrs = torch.tensor(bond_attrs, dtype=torch.float)
 
-  data = Data(x=x, edge_index=edge_indices, edge_attr=edge_attrs)
+  data = Data(x=x, pos=positions, edge_index=edge_indices, edge_attr=edge_attrs)
 
   return data
 
