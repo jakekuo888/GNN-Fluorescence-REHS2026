@@ -1,4 +1,5 @@
 cirpy==1.0.2
+egnn_pytorch==0.2.8
 matplotlib==3.11.0
 numpy==2.5.1
 pandas==3.0.3
