@@ -9,10 +9,10 @@ from sklearn.model_selection import train_test_split, KFold
 import sys
 import os
 
-from neural_networks import ModelTwo
-from early_stop import EarlyStop
+from models.neural_networks import ModelTwo
+from models.early_stop import EarlyStop
 
-from process_data import absorption_data_options, PredOption, generate_graphs_labels
+from setup.process_data import absorption_data_options, PredOption, generate_graphs_labels
 
 #EASY CONTROLS vvv
 n_epochs = 1
@@ -24,7 +24,7 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(os.path.join(root_dir, 'data-wrangling'))
 sys.path.append(os.path.join(root_dir, 'plots-visuals'))
 
-from plot_similarity_error import plot_vector_similarity_loss_graph, plot_smiles_similarity_loss_graph
+from plotting.plot_similarity_error import plot_vector_similarity_loss_graph, plot_smiles_similarity_loss_graph
 
 re_generate_data = False
 
