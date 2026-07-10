@@ -6,8 +6,10 @@ from rdkit.Chem import rdFingerprintGenerator
 import os
 import json
 
+
 def is_null_graph(graph):
     return graph.x.shape[0] == 1 and graph.x.sum() == 0
+
 
 def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, folder, out_file):
     dest_path = "edited_chromophores.csv"
@@ -21,10 +23,10 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
         if h not in (mol_label, sol_label, predicted_name)
     ])
 
-    m_graphs = []
+    m_dicts = []
     s_prints = []
-    #s_graphs = []
-    v_rows = [] #valid_rows
+    # s_graphs = []
+    v_rows = []  # valid_rows
 
     print("Going through data")
 
@@ -39,40 +41,40 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
 
     for idx, row in chromophore_df.iterrows():
         if np.isnan(row[predicted_name]):
-            #print(f"Data @{idx} is not provided \n SKIPPING")
+            # print(f"Data @{idx} is not provided \n SKIPPING")
             continue
 
         if row[sol_label] == "gas":
             continue
 
         if pd.isna(row[mol_label]) or pd.isna(row[sol_label]):
-            #print(f"Missing SMILES @{idx} \n SKIPPING")
+            # print(f"Missing SMILES @{idx} \n SKIPPING")
             continue
-        
+
         fragmentation_output = smiles_to_graph(row[mol_label])
         fragmentation_output = {} if fragmentation_output is None else fragmentation_output
         mgraph = fragmentation_output["entire_graph"]
         sol_smiles = resolve_smiles(row[sol_label], SOLVENT_SMILES, CACHE_FILE)
-        #sgraph = smiles_to_graph(row[sol_label])
+        # sgraph = smiles_to_graph(row[sol_label])
         if sol_smiles is None:
             print(f"Failed to resolve: '{row[sol_label]}'")
         if mgraph is None or sol_smiles is None:
-            #print(f"Cannot parse either molecular or solvent smiles @{idx} \n SKIPPING")
+            # print(f"Cannot parse either molecular or solvent smiles @{idx} \n SKIPPING")
             continue
 
         sprint = smiles_to_morgan_fp(fp_gen, sol_smiles)
 
-        mgraph.smiles = str(row[mol_label])
-        #sgraph.smiles = str(row[sol_label])
+        # mgraph.smiles = str(row[mol_label])
+        # sgraph.smiles = str(row[sol_label])
 
-        m_graphs.append(mgraph)
-        #s_graphs.append(sgraph)
+        m_dicts.append(fragmentation_output)
+        # s_graphs.append(sgraph)
         s_prints.append(sprint)
         v_rows.append(idx)
 
         Data = chromophore_df.loc[v_rows, predicted_name].tolist()
 
-    #export
+    # export
 
     print("Uploading data")
 
@@ -82,9 +84,10 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
 
     fp_matrix = np.vstack(s_prints)
 
-    torch.save(m_graphs, f"./data/{folder}/molecularGraphs-{dataset}.pt")
-    #torch.save(s_graphs, f"./data/{folder}/solventGraphs-{dataset}.pt")
-    np.savez_compressed(f"./data/{folder}/solventFingerprints-{dataset}.npz", fps=fp_matrix)
+    torch.save(m_dicts, f"./data/{folder}/molecularGraphs-{dataset}.pt")
+    # torch.save(s_graphs, f"./data/{folder}/solventGraphs-{dataset}.pt")
+    np.savez_compressed(
+        f"./data/{folder}/solventFingerprints-{dataset}.npz", fps=fp_matrix)
 
     print("Process DONE")
     print(f"Data points collected: {len(Data)}")
