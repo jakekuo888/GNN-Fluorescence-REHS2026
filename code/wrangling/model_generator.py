@@ -13,59 +13,62 @@ from torch_geometric.utils import subgraph
 import json
 import os
 
-#https://www.blopig.com/blog/2022/02/how-to-turn-a-smiles-string-into-a-molecular-graph-for-pytorch-geometric/
+# https://www.blopig.com/blog/2022/02/how-to-turn-a-smiles-string-into-a-molecular-graph-for-pytorch-geometric/
 
 
 def get_atom_features(atom):
-  permitted_atoms = ['C', 'N', 'O', 'S', 'F', 'Cl', 'Br', 'I', 'Se', 'Te', 'Si', 'P', 'B', 'Sn', 'Ge']
-  #one-hot everything
-  atom_type = [int(atom.GetSymbol() == x) for x in permitted_atoms]
+    permitted_atoms = ['C', 'N', 'O', 'S', 'F', 'Cl',
+                       'Br', 'I', 'Se', 'Te', 'Si', 'P', 'B', 'Sn', 'Ge']
+    # one-hot everything
+    atom_type = [int(atom.GetSymbol() == x) for x in permitted_atoms]
 
-  atomH = atom.GetHybridization()
-  hybridization = [
-      int(atomH == Chem.rdchem.HybridizationType.SP),
-      int(atomH == Chem.rdchem.HybridizationType.SP2),
-      int(atomH == Chem.rdchem.HybridizationType.SP3)
-  ]
+    atomH = atom.GetHybridization()
+    hybridization = [
+        int(atomH == Chem.rdchem.HybridizationType.SP),
+        int(atomH == Chem.rdchem.HybridizationType.SP2),
+        int(atomH == Chem.rdchem.HybridizationType.SP3)
+    ]
 
-  charge = float(atom.GetDoubleProp('_GasteigerCharge'))
-  if not np.isfinite(charge):
-      charge = 0.0
+    charge = float(atom.GetDoubleProp('_GasteigerCharge'))
+    if not np.isfinite(charge):
+        charge = 0.0
 
-  chirality_options = [
-    Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
-    Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
-    Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW,
-    Chem.rdchem.ChiralType.CHI_OTHER
-  ]
-  chirality = [int(atom.GetChiralTag() == c) for c in chirality_options]
+    chirality_options = [
+        Chem.rdchem.ChiralType.CHI_UNSPECIFIED,
+        Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW,
+        Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW,
+        Chem.rdchem.ChiralType.CHI_OTHER
+    ]
+    chirality = [int(atom.GetChiralTag() == c) for c in chirality_options]
 
-  features = atom_type + hybridization + chirality + [
+    features = atom_type + hybridization + chirality + [
         atom.GetDegree(),
         atom.GetFormalCharge(),
         int(atom.GetIsAromatic()),
         int(atom.IsInRing()),
         charge
-  ]
+    ]
 
-  return features
+    return features
+
 
 def get_bond_features(bond):
-  bondGBT = bond.GetBondType()
+    bondGBT = bond.GetBondType()
 
-  bond_type = [
-      int(bondGBT == Chem.rdchem.BondType.SINGLE),
-      int(bondGBT == Chem.rdchem.BondType.DOUBLE),
-      int(bondGBT == Chem.rdchem.BondType.TRIPLE),
-      int(bondGBT == Chem.rdchem.BondType.AROMATIC)
-  ]
+    bond_type = [
+        int(bondGBT == Chem.rdchem.BondType.SINGLE),
+        int(bondGBT == Chem.rdchem.BondType.DOUBLE),
+        int(bondGBT == Chem.rdchem.BondType.TRIPLE),
+        int(bondGBT == Chem.rdchem.BondType.AROMATIC)
+    ]
 
-  features = bond_type + [
-      int(bond.IsInRing()),
-      int(bond.GetIsConjugated())
-  ]
+    features = bond_type + [
+        int(bond.IsInRing()),
+        int(bond.GetIsConjugated())
+    ]
 
-  return features
+    return features
+
 
 def resolve_smiles(name, dictionary, file):
     blocker = rdBase.BlockLogs()
@@ -108,18 +111,20 @@ def resolve_smiles(name, dictionary, file):
             print(f"Fetching SMILES for: {name}")
             result = cirpy.resolve(name, 'smiles')
             dictionary[name] = result  # cache even if None
-            
+
             # save updated cache to disk
             with open(file, 'w') as f:
                 json.dump(dictionary, f)
-            
+
             return result
     else:
         return name
 
+
 def return_frags(mol, graph):
     bonds_to_break = [b[0] for b in BRICS.FindBRICSBonds(mol)]
-    bond_indices = [mol.GetBondBetweenAtoms(i, j).GetIdx() for i, j in bonds_to_break]
+    bond_indices = [mol.GetBondBetweenAtoms(
+        i, j).GetIdx() for i, j in bonds_to_break]
 
     frag_mol = rdmolops.FragmentOnBonds(mol, bond_indices, addDummies=False)
     atom_groups = Chem.GetMolFrags(frag_mol, asMols=False)
@@ -139,7 +144,7 @@ def return_frags(mol, graph):
             edge_attr=sub_edge_attr,
         )
         fragment_graphs.append(frag_data)
-    
+
     atom_to_frag = {}
     for frag_id, atom_idx_group in enumerate(atom_groups):
         for atom_idx in atom_idx_group:
@@ -155,7 +160,7 @@ def return_frags(mol, graph):
     frag_fps = [
         fp_gen.GetFingerprint(mol=mol, fromAtoms=list(g)) for g in atom_groups
     ]
-    
+
     fragmentation_output = {
         "frag_graphs": fragment_graphs,
         "atom_groups": atom_groups,
@@ -167,67 +172,73 @@ def return_frags(mol, graph):
 
     return fragmentation_output
 
+
 def smiles_to_graph(smiles):
-  blocker = rdBase.BlockLogs()
+    blocker = rdBase.BlockLogs()
 
-  CACHE_FILE = './data/solvent_cache.json'
-  if os.path.exists(CACHE_FILE):
-    with open(CACHE_FILE, 'r') as f:
-        SOLVENT_SMILES = json.load(f)
-  else:
-      SOLVENT_SMILES = {}
-  
-  NUM_NODE_FEATURES = 27
-  NUM_EDGE_FEATURES = 6
+    CACHE_FILE = './data/solvent_cache.json'
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, 'r') as f:
+            SOLVENT_SMILES = json.load(f)
+    else:
+        SOLVENT_SMILES = {}
 
-  mol = Chem.MolFromSmiles(str(smiles))
-  if mol is None:
-      resolved = resolve_smiles(str(smiles), SOLVENT_SMILES, CACHE_FILE)
-      if resolved is None:
-          return None
-      mol = Chem.MolFromSmiles(resolved)
-      if mol is None:
-          return None
+    NUM_NODE_FEATURES = 27
+    NUM_EDGE_FEATURES = 6
 
-  mol = Chem.AddHs(mol)
-  rdDistGeom.EmbedMolecule(mol)
-  rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
+    mol = Chem.MolFromSmiles(str(smiles))
+    if mol is None:
+        resolved = resolve_smiles(str(smiles), SOLVENT_SMILES, CACHE_FILE)
+        if resolved is None:
+            return None
+        mol = Chem.MolFromSmiles(resolved)
+        if mol is None:
+            return None
 
-  conf = mol.GetConformer()
-  positions = conf.GetPositions()
+    mol = Chem.AddHs(mol)
+    rdDistGeom.EmbedMolecule(mol)
+    rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
 
-  rdPartialCharges.ComputeGasteigerCharges(mol)
-  
-  node_feats = [get_atom_features(atom) for atom in mol.GetAtoms()]
-  x = torch.tensor(node_feats, dtype=torch.float)
+    conf = mol.GetConformer()
+    positions = conf.GetPositions()
 
-  bond_indices = []
-  bond_attrs = []
+    rdPartialCharges.ComputeGasteigerCharges(mol)
 
-  for bond in mol.GetBonds():
-    start_idx = bond.GetBeginAtomIdx()
-    end_idx = bond.GetEndAtomIdx()
+    node_feats = [get_atom_features(atom) for atom in mol.GetAtoms()]
+    x = torch.tensor(node_feats, dtype=torch.float)
 
-    attr = get_bond_features(bond)
+    bond_indices = []
+    bond_attrs = []
 
-    #do twice so it's treated like an undirected graph
-    bond_indices.append([start_idx, end_idx])
-    bond_indices.append([end_idx, start_idx])
+    for bond in mol.GetBonds():
+        start_idx = bond.GetBeginAtomIdx()
+        end_idx = bond.GetEndAtomIdx()
 
-    bond_attrs.append(attr)
-    bond_attrs.append(attr)
+        attr = get_bond_features(bond)
 
-  edge_indices = torch.tensor(bond_indices, dtype=torch.long).t().contiguous()
-  edge_attrs = torch.tensor(bond_attrs, dtype=torch.float)
+        # do twice so it's treated like an undirected graph
+        bond_indices.append([start_idx, end_idx])
+        bond_indices.append([end_idx, start_idx])
 
-  data = Data(x=x, pos=positions, edge_index=edge_indices, edge_attr=edge_attrs)
+        bond_attrs.append(attr)
+        bond_attrs.append(attr)
 
-  return return_frags(mol, data)
+    edge_indices = torch.tensor(
+        bond_indices, dtype=torch.long).t().contiguous()
+    edge_attrs = torch.tensor(bond_attrs, dtype=torch.float)
+
+    data = Data(x=x, pos=positions, edge_index=edge_indices,
+                edge_attr=edge_attrs)
+
+    data.smiles = smiles
+
+    return return_frags(mol, data)
+
 
 def smiles_to_morgan_fp(fp_gen, smiles):
-	mol = Chem.MolFromSmiles(smiles)
-	bit_vect = fp_gen.GetFingerprint(mol)
-	fp_array = np.zeros((2048,), dtype=np.int8)
-	Chem.DataStructs.ConvertToNumpyArray(bit_vect, fp_array)
+    mol = Chem.MolFromSmiles(smiles)
+    bit_vect = fp_gen.GetFingerprint(mol)
+    fp_array = np.zeros((2048,), dtype=np.int8)
+    Chem.DataStructs.ConvertToNumpyArray(bit_vect, fp_array)
 
-	return fp_array
+    return fp_array
