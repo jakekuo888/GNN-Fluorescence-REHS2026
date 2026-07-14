@@ -167,7 +167,8 @@ def return_frags(mol, graph):
         "atom_to_frag_map": atom_to_frag,
         "cut_bonds": gs_edges,
         "frag_fps": frag_fps,
-        "entire_graph": graph
+        "entire_graph": graph,
+        "smiles": graph.smiles
     }
 
     return fragmentation_output

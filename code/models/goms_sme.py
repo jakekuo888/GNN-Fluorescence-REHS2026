@@ -39,3 +39,19 @@ class FragEGNN(nn.Module):
         frag_vectors = global_mean_pool(feats[mask], batch)
 
         return frag_vectors
+
+
+class Model(nn.Module):
+    def __init__(self, node_features, edge_features, num_layers=3):
+        super().__init__()
+
+        self.egnn = FragEGNN(node_features, edge_features, num_layers)
+
+    def forward(self, x, pos, edge_index, edge_attr, batch, frags_per_mol, mol_dicts):
+        frag_vecs = self.egnn(x, pos, edge_index, edge_attr, batch)
+
+        per_mol_fragment_vectors = []
+        offset = 0
+        for k in frags_per_mol:
+            per_mol_fragment_vectors.append(frag_vecs[offset: offset + k])
+            offset += k
