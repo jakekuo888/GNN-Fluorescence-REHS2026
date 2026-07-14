@@ -1,12 +1,27 @@
 # GNN-Fluorescence-REHS2026
-Project for Research Experience for High School 2026 by Krish Nandola and Jake Kuo under the guidance of Dr. Andreas Goetz and Dr. Vikrant Tripathy.
+Project for Research Experience for High School 2026 by Krish Nandola and Jake Kuo under the guidance of Dr. Andreas Goetz and Dr. Vikrant Tripathy. In collaboration with San Diego Supercomputing Center, UCSD.
 
-# Architecture
+## Abstract
+
+Determining the absorbance, emission, and lifetime of chromophores in different solvents using machine learning-assisted chemistry. 
+
+## Frameworks
+
+### Current Architecture
+
 ![New Architecture](./readme/model_new.jpg)
----
-The above is the architecture we are currently attempting to model.
 
-# Requirements
+The current architecture of the model, based off of Qu, S. and Park, C. (2025) work in GoMS: Graph of Molecular Substructure Network for Molecule Property Prediction.
+
+---
+
+### SME
+
+![SME](./readme/SME.jpg)
+
+Dropout of fragments in the molecule, allowing the model to determine the most important pieces of the molecule for prediction. Allows the creation of heat-maps and other visual aids, as seen in `./plots-visuals`.
+
+## Requirements
 - cirpy==1.0.2
 - egnn_pytorch==0.2.8
 - matplotlib==3.11.0
@@ -19,7 +34,7 @@ The above is the architecture we are currently attempting to model.
 
 Quick install requirements with `pip install -r requirements.txt`
 
-# References
+## References
 ---
 Beard, E.J., Sivaraman, G., Vázquez-Mayagoitia, Á., Vishwanath, V. and Cole, J.M. (2019). Comparative dataset of experimental and computational attributes of UV/vis absorption spectra. Scientific Data, 6(1). doi:10.1038/s41597-019-0306-0.
 
