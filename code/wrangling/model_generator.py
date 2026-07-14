@@ -211,7 +211,7 @@ def gen_data(dict_, frag):
     if not torch.is_tensor(entire_pos):
         entire_pos = torch.tensor(entire_pos, dtype = torch.float)
 
-    pos = toch.stack([
+    pos = torch.stack([
         entire_pos[list(atom_groups[f_idx])].mean(dim=0)
         for f_idx in range(n_frags)
     ])
