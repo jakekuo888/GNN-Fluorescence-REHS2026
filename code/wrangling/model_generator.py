@@ -156,9 +156,9 @@ def return_frags(mol, graph):
         gs_edges.add((min(frag_a, frag_b), max(frag_a, frag_b)))
 
     fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+    
     frag_fps = [
-        fp_gen.GetFingerprint(mol=mol, fromAtoms=list(g))
-        for g in atom_groups
+        fp_gen.GetFingerprint(mol=mol, fromAtoms=list(g)) for g in atom_groups
     ]
 
     fragmentation_output = {

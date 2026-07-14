@@ -129,6 +129,36 @@ def collate_fn(mol_dicts):
     return atom_batch, frags_per_mol, mol_dicts
 
 
+def generate_GOMS(dicts, frags):
+    GOMS = []
+
+    for d, fs in zip(dicts, frags):
+        n_frags = len(fs)
+        x_ = torch.tensor(fs, dtype = torch.float)
+
+        cut_bonds = []
+
+        e_idx = 
+
+        #each d is dict for mol x
+        #fs is frags for mol x
+
+        for f in fs:
+            f
+        
+        graph = Data(
+            x = x_,
+            edge_index = e_idx,
+            edge_attr = edge_attr,
+            pos = pos,
+            y = y,
+        )
+
+        GOMS.append(graph)
+
+    return GOMS
+
+
 if re_generate_data:
     for option in absorption_data_options:
         generate_graphs_labels(option, generate_data=True)
