@@ -12,6 +12,7 @@ import sys
 import os
 
 from models.neural_networks import ModelTwo
+from models.goms_sme import Model
 from models.early_stop import EarlyStop
 from models.goms_sme import FragEGNN
 
@@ -54,29 +55,18 @@ ext_loader = TorchLoader(FragmentDataset(
     ext_dataset), batch_size=256, shuffle=True, collate_fn=collate_fn)
 
 # Set up the Model class (GNN/FFNN), AdamW optimizer, and MAE Loss function
-node_features = molecules_list[0].num_node_features
-edge_features = molecules_list[0].num_edge_features
+node_features = molecules_dicts[0]["frag_graphs"][0].num_node_features
+edge_features = molecules_dicts[0]["frag_graphs"][0].num_edge_features
+gs_edge_features = molecules_dicts[0]["edge_attr"].shape[1]
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-models = []
-optimizers = []
-schedulers = []
-stoppers = []
-
-for i in range(9):
-    model = ModelTwo(node_features, edge_features, 128, train_solv_features, [
-                     128, 128, 128], [128, 128, 128]).to(device)
-    optimizer = torch.optim.AdamW(
-        model.parameters(), lr=0.001, weight_decay=5e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=5)
-
-    # appending to lists
-    models.append([model, ""])
-    optimizers.append(optimizer)
-    schedulers.append(scheduler)
-    stoppers.append(EarlyStop(9, 0.005))
+model = Model(node_features, edge_features, 64,
+              gs_edge_features, train_solv_features)
+optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    optimizer, mode='min', factor=0.5, patience=5)
+stopper = EarlyStop(9, 0.005)
 
 criterion = torch.nn.L1Loss()
 
@@ -86,15 +76,17 @@ criterion = torch.nn.L1Loss()
 def train(model, opt, loader):
     model.train()
 
-    for data in loader:
+    for data, frags_per_mol, mol_dicts in loader:
         data.to(device)
 
         sol_fp = torch.tensor(np.array(data.sol_fp),
                               dtype=torch.float).to(device)
-        vector_out, out = model(
-            data.x, data.edge_index, data.edge_attr, data.batch, sol_fp
-        )
-        loss = criterion(out, data.y.view(-1, 1))
+        _, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
+                       data.batch, frags_per_mol, mol_dicts, sol_fp)
+        y = torch.tensor([d["y_norm"] for d in mol_dicts],
+                         dtype=torch.float).to(device).unsqueeze(-1)
+
+        loss = criterion(out, y)
         opt.zero_grad()
         loss.backward()
         opt.step()
@@ -115,14 +107,17 @@ def test(model, loader, mean, std, compute_mae=True, is_test_set=False, collect_
 
     with torch.no_grad():
 
-        for data in loader:
+        for data, frags_per_mol, mol_dicts in loader:
             data.to(device)
 
             sol_fp = torch.tensor(np.array(data.sol_fp),
                                   dtype=torch.float).to(device)
-            vector_out, out = model(
-                data.x, data.edge_index, data.edge_attr, data.batch, sol_fp
-            )
+            vector_out, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
+                                    data.batch, frags_per_mol, mol_dicts, sol_fp)
+            y = torch.tensor([d["y_norm"] for d in mol_dicts],
+                             dtype=torch.float).to(device).unsqueeze(-1)
+
+            loss = criterion(out, y)
 
             # Reverse normalization for prediction
             pred_log = out.squeeze() * std + mean
@@ -130,8 +125,8 @@ def test(model, loader, mean, std, compute_mae=True, is_test_set=False, collect_
             pred_actual = pred_actual.flatten()
 
             # Reverse normalization for target too
-            target_log = data.y.flatten() * std + mean
-            target_actual = torch.exp(target_log)
+            target_actual = torch.tensor([d["y_real"] for d in mol_dicts],
+                                         dtype=torch.float).to(device).unsqueeze(-1)
 
             loss = torch.mean(torch.abs(pred_actual - target_actual))
 
@@ -155,51 +150,40 @@ def test(model, loader, mean, std, compute_mae=True, is_test_set=False, collect_
         return 0.0
 
 
-def run_model(model, train_loader, val_loader, opt, sched, idx):
+def run_model(model, train_loader, val_loader, opt, sched, stopper):
     # Train & Test the Model
-    with open(f"./data/plot-data/loss-model-{idx}.txt", "w") as f_:
+    with open(f"./data/plot-data/loss.txt", "w") as f_:
         for epoch in range(1, n_epochs+1):
             train(model, opt, train_loader)
 
             train_avg_mae = test(model, train_loader, y_mean, y_std)
-            sample_avg_mae = test(model, val_loader, y_mean, y_std)
-            sched.step(float(sample_avg_mae))
+            val_avg_mae = test(model, val_loader, y_mean, y_std)
+            sched.step(float(val_avg_mae))
 
-            if stoppers[idx].stop_early(sample_avg_mae, model):
+            if stopper.stop_early(val_avg_mae, model):
                 print(f'Early stop has been initiated on Epoch #{epoch}')
-                stoppers[idx].restore_best(model)
+                stopper.restore_best(model)
                 break
 
             print(
-                f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {sample_avg_mae:.4f} | Early stopper count: {stoppers[idx].count}")
+                f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {val_avg_mae:.4f} | Early stopper count: {stopper.count}")
             if (collect_data):
                 # loading data for plotting (train, test)
-                print(f"{train_avg_mae:.4f}, {sample_avg_mae:.4f}", file=f_)
+                print(f"{train_avg_mae:.4f}, {val_avg_mae:.4f}", file=f_)
 
 
-def test_model(model, test_loader, idx):
-    test_avg_mae = test(model, test_loader, y_mean, y_std, compute_mae=True)
-    print(f"TEST AVERAGE MAE FOR MODEL #{idx} (FINAL RESULTS): {test_avg_mae}")
-
-    with open("./models/information.txt", "w") as f_:
-        print(
-            f"TEST AVERAGE MAE FOR MODEL #{idx} (FINAL RESULTS): {test_avg_mae}", file=f_)
-
-
-for idx in range(len(models)):
-    print(
-        f"\n---------------------------------------- MODEL #{idx} RUNNING NOW ----------------------------------------")
-    run_model(models[idx][0], train_loaders[idx],
-              validate_loaders[idx], optimizers[idx], schedulers[idx], idx)
+run_model(model, train_loader, val_loader, optimizer, scheduler, stopper)
 
 print("UNDERGOING TESTING")
 print("-" * 45)
 
-for idx in range(len(models)):
-    test_model(models[idx][0], test_loaders[idx], idx)
-    torch.save(models[idx][0].state_dict(),
-               f"./models/model_{idx}_weights.pth")
-    models[idx].append(f"./models/model_{idx}_weights.pth")
+test_avg_mae = test(model, test_loader, y_mean, y_std, compute_mae=True)
+print(
+    f"TEST AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n-------------------------------")
+
+test_avg_mae = test(model, ext_loader, y_mean, y_std, compute_mae=True)
+print(
+    f"EXTERNAL AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n-------------------------------")
 
 
 # visuals
@@ -213,12 +197,14 @@ if (collect_data):
     print("Creating plotting loss visuals \n ...")
     subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
     print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
-    
+
     print("Creating scatterplot of the error vs similarity (vectors) \n ...")
-    plot_vector_similarity_loss_graph(train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
+    plot_vector_similarity_loss_graph(
+        train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
     print("Scatterplot successfully created! \n Check plots-visuals/new-plots")
 
     print("Creating scatterplot of the error vs similarity (smiles) \n ...")
-    plot_smiles_similarity_loss_graph(train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)
+    plot_smiles_similarity_loss_graph(
+        train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)
 """
 print("PROCESS DONE")
