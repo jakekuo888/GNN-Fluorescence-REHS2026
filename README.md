@@ -21,8 +21,12 @@ Quick install requirements with `pip install -r requirements.txt`
 
 # References
 ---
-- Deep4Chem: https://www.nature.com/articles/s41597-020-00634-8
-- Beard et. al: https://www.nature.com/articles/s41597-019-0306-0
-- NublaColors: https://www.nature.com/articles/s42004-026-01944-5
-- GOMS: https://arxiv.org/abs/2512.12489
-- SME: https://www.nature.com/articles/s41467-023-38192-3
+Beard, E.J., Sivaraman, G., Vázquez-Mayagoitia, Á., Vishwanath, V. and Cole, J.M. (2019). Comparative dataset of experimental and computational attributes of UV/vis absorption spectra. Scientific Data, 6(1). doi:10.1038/s41597-019-0306-0.
+
+Joung, J.F., Han, M., Jeong, M. and Park, S. (2020). Experimental database of optical properties of organic compounds. Scientific Data, 7(1). doi:10.1038/s41597-020-00634-8.
+
+Potapov, D., Rogovoi, S., Khrabrov, K., Ushenin, K., Korovin, A., Ber, A., Kadurin, A. and Tsypin, A. (2026). A conformational benchmark for optical property prediction with solvent-aware graph neural networks. Communications Chemistry, [online] 9(1). doi:10.1038/s42004-026-01944-5.
+
+Qu, S. and Park, C. (2025). GoMS: Graph of Molecule Substructure Network for Molecule Property Prediction. [online] arXiv.org. Available at: https://arxiv.org/abs/2512.12489 [Accessed 14 July 2026].
+
+Wu, Z., Wang, J., Du, H., Jiang, D., Kang, Y., Li, D., Pan, P., Deng, Y., Cao, D.S., Hsieh, C.Y. and Hou, T. (2023). Chemistry-intuitive explanation of graph neural networks for molecular property prediction with substructure masking. Nature Communications, 14(1). doi:10.1038/s41467-023-38192-3.
