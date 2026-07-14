@@ -94,7 +94,7 @@ def generate_graphs_labels(chosen_option, generate_data=False, y_mean=None, y_st
         y_mean = y_log.mean()
         y_std = y_log.std()
 
-    y_normalized = (y_log - y_mean) / y_std
+    y_normalized = (y_log - y_mean) / y_std  # type: ignore
 
     # Attach the y-labels to the x values
     for d, label in zip(molecules_dicts, y_normalized):
