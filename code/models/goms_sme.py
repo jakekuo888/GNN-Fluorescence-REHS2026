@@ -77,11 +77,13 @@ class GAT(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, node_features, edge_features, hidden_channels, solv_features, num_layers=3):
+    def __init__(self, node_features, edge_features, hidden_channels, gs_edge_features, solv_features, num_layers=3):
         super().__init__()
 
+        self.hidden_channels = hidden_channels
+        self.num_layers = num_layers
         self.egnn = FragEGNN(node_features, edge_features, num_layers)
-        self.gat = GAT(node_features, edge_features,
+        self.gat = GAT(node_features, gs_edge_features,
                        hidden_channels, num_layers)
         self.sol_ffnn = FFNN(solv_features, hidden_channels,
                              hidden_sizes=[64, 64, 64])
@@ -99,10 +101,11 @@ class Model(nn.Module):
         goms = []
         for frag_x, d in zip(per_mol_fragment_vectors, mol_dicts):
             data = Data(
-                x=frag_x, edge_index=d["gs_edge_index"], edge_attr=d["gs_edge_attr"])
+                x=frag_x, edge_index=d["edge_index"], edge_attr=d["edge_attr"])
             goms.append(data)
 
         gs_batch = Batch.from_data_list(goms)
+
         mol_readout = self.gat(
             gs_batch.x, gs_batch.edge_index, gs_batch.edge_attr, gs_batch.batch)  # type: ignore
         solv_readout = self.sol_ffnn(solv_morgan)
