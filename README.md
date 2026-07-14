@@ -35,7 +35,6 @@ Dropout of fragments in the molecule, allowing the model to determine the most i
 Quick install requirements with `pip install -r requirements.txt`
 
 ## References
----
 Beard, E.J., Sivaraman, G., Vázquez-Mayagoitia, Á., Vishwanath, V. and Cole, J.M. (2019). Comparative dataset of experimental and computational attributes of UV/vis absorption spectra. Scientific Data, 6(1). doi:10.1038/s41597-019-0306-0.
 
 Joung, J.F., Han, M., Jeong, M. and Park, S. (2020). Experimental database of optical properties of organic compounds. Scientific Data, 7(1). doi:10.1038/s41597-020-00634-8.
