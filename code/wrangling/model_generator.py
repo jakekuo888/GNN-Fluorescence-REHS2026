@@ -173,6 +173,57 @@ def return_frags(mol, graph):
 
     return fragmentation_output
 
+def gen_data(dict_, frag):
+    #objective: return a bigger dict to be make one-liner GNN
+    n_frags = len(frag)
+    x_ = torch.tensor(frag, dtype = torch.float)
+
+    entire_graph = dict_['entire_graph']
+    atom_to_frag = dict_['atom_to_frag_map']
+    cut_bonds = dict_['cut_bonds']
+    atom_groups = dict_['atom_groups']
+
+    pair_to_attr = {}
+    src_all, dst_all = entire_graph.edge_index
+    for k in range(entire_graph.edge_index.size(1)):
+        a1, a2 = src_all[k].item(), dst_all[k].item()
+        f1, f2 = atom_to_frag[a1], atom_to_frag[a2]
+        if f1 != f2:
+            key = (min(f1, f2), max(f1, f2))
+            if key not in pair_to_attr:
+                pair_to_attr[key] = entire_graph.edge_attr[k]
+
+    src, dst, edge_attr_list = [], [], []
+    for (f1, f2) in cut_bonds:
+        attr = pair_to_attr[(min(f1, f2), max(f1, f2))]
+        src += [f1, f2]
+        dst += [f2, f1]
+        edge_attr_list += [attr, attr]
+
+    if edge_attr_list:
+        e_idx = torch.tensor([src, dst], dtype=torch.long)
+        edge_attr = torch.stack(edge_attr_list)
+    else:
+        e_idx = torch.empty((2, 0), dtype=torch.long)
+        edge_attr = torch.empty((0, entire_graph.edge_attr.size(-1)), dtype=torch.float)
+
+    entire_pos = entire_graph.pos
+    if not torch.is_tensor(entire_pos):
+        entire_pos = torch.tensor(entire_pos, dtype = torch.float)
+
+    pos = toch.stack([
+        entire_pos[list(atom_groups[f_idx])].mean(dim=0)
+        for f_idx in range(n_frags)
+    ])
+
+    dict_['x'] = x_
+    dict_['edge_index'] = e_idx
+    dict_['edge_attr'] = edge_attr
+    dict_['pos'] = pos
+    dict_['y'] = dict_['y_norm']
+    dict_['n_frags'] = n_frags
+
+    return dict_
 
 def smiles_to_graph(smiles):
     blocker = rdBase.BlockLogs()

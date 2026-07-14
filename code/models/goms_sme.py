@@ -47,33 +47,6 @@ class Model(nn.Module):
 
         self.egnn = FragEGNN(node_features, edge_features, num_layers)
 
-    def generate_GOMS(dicts, frags):
-        GOMS = []
-
-        for dict_, frag_ in zip(dicts, frags):
-            n_frags = len(frag_)
-            x_ = torch.tensor(frag_, dtype = torch.float)
-
-            """
-            entr_graph = dict_['entire_graph']
-            fta = dict_['frag_to_atom']
-            cut_bonds = dict_['cut_bonds']
-            """
-            
-            #waiting for dict to be updated before I can proceed any further
-
-            graph = Data(
-                x = x_,
-                edge_index = e_idx,
-                edge_attr = edge_attr,
-                pos = pos,
-                y = y,
-            )
-
-            GOMS.append(graph)
-
-        return GOMS
-
     def forward(self, x, pos, edge_index, edge_attr, batch, frags_per_mol, mol_dicts):
         frag_vecs = self.egnn(x, pos, edge_index, edge_attr, batch)
 
