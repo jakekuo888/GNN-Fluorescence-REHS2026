@@ -205,20 +205,18 @@ for idx in range(len(models)):
 # visuals
 if (collect_data):
     want_visuals = input("\n Do you want to create Visuals (Y/N): ").lower()
-    print("Visuals not available currently.")
-    """
-  this is kind of broken currently, will try graphing when it is possible (later)
-  if(want_visuals == 'y'):
+    #print("Visuals not available currently.")
+    if(want_visuals == 'y'):
+        print("Creating plotting loss visuals \n ...")
+        subprocess.run([sys.executable, "./code/plotting/plot-loss.py"])
+        print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
 
-    print("Creating plotting loss visuals \n ...")
-    subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
-    print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
-    
-    print("Creating scatterplot of the error vs similarity (vectors) \n ...")
-    plot_vector_similarity_loss_graph(train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
-    print("Scatterplot successfully created! \n Check plots-visuals/new-plots")
+        print("Creating scatterplot of the error vs similarity (vectors) \n ...")
+        plot_vector_similarity_loss_graph(train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
+        print("Scatterplot successfully created! \n Check plots-visuals/new-plots")
 
-    print("Creating scatterplot of the error vs similarity (smiles) \n ...")
-    plot_smiles_similarity_loss_graph(train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)
-"""
-print("PROCESS DONE")
+        print("Creating scatterplot of the error vs similarity (smiles) \n ...")
+        plot_smiles_similarity_loss_graph(train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)
+        print("PLOTTING COMPLETED")
+
+print("PROCESS DONE.")
