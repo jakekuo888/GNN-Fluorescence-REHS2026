@@ -1,6 +1,10 @@
 # GNN-Fluorescence-REHS2026
-Project for REHS 2026 by Krish Nandola and Jake Kuo
+Project for Research Experience for High School 2026 by Krish Nandola and Jake Kuo under the guidance of Dr. Andreas Goetz and Dr. Vikrant Tripathy.
 
+# Architecture
+![New Architecture](./readme/model_new.jpg)
+---
+The above is the architecture we are currently attempting to model.
 
 # Requirements
 - cirpy==1.0.2
