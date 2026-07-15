@@ -260,7 +260,19 @@ def smiles_to_graph(smiles):
 
     mol = Chem.AddHs(mol)
     rdDistGeom.EmbedMolecule(mol)
-    rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
+    #print(f"If this is the last message, the offending smiles is: {smiles}")
+    
+    try:
+        rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
+    except Exception as e:
+        try:
+            #print(f"ERROR WITH RUNNING IN MMFF: \n {e} \n Offender: {smiles} \n \n Attempting UFF instead")
+            mol = Chem.AddHs(Chem.MolFromSmiles(str(smiles)))
+            rdDistGeom.EmbedMolecule(mol, randomSeed=42)
+            rdForceFieldHelpers.UFFOptimizeMolecule(mol)
+        except Exception as e_:
+            #print(f"ERR. RUNNING UFF: \n \t{e_} \n \n SKIPPING MOL: {smiles}")
+            return None
 
     conf = mol.GetConformer()
     positions = conf.GetPositions()
