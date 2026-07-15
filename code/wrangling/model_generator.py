@@ -294,6 +294,7 @@ def smiles_to_graph(smiles):
             return None
 
     mol = Chem.AddHs(mol)
+<<<<<<< HEAD
 
     conf_id = embed_conformer(mol)
     if conf_id == -1:
@@ -314,6 +315,29 @@ def smiles_to_graph(smiles):
     except Exception as e:
         print(f"CRITICAL ERROR: CONFORMER FAILED-- {smiles}")
         return None
+=======
+    rdDistGeom.EmbedMolecule(mol)
+    #print(f"If this is the last message, the offending smiles is: {smiles}")
+    
+    try:
+        rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
+    except Exception as e:
+        try:
+            #print(f"ERROR WITH RUNNING IN MMFF: \n {e} \n Offender: {smiles} \n \n Attempting UFF instead")
+            mol = Chem.AddHs(Chem.MolFromSmiles(str(smiles)))
+            rdDistGeom.EmbedMolecule(mol, randomSeed=42)
+            rdForceFieldHelpers.UFFOptimizeMolecule(mol)
+        except Exception as e_:
+            #print(f"ERR. RUNNING UFF: \n \t{e_} \n \n SKIPPING MOL: {smiles}")
+            return None
+
+    try:
+        conf = mol.GetConformer()
+    except Exception as e:
+        print(f"No valid conformer: {smiles} \n ERR: \n {e} \n")
+        return None
+
+>>>>>>> 059cf9acdc64bf5e80947ed50238540ba9b0268c
     positions = conf.GetPositions()
     positions = torch.tensor(positions, dtype=torch.float)
 
