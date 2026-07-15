@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import torch
-from model_generator import smiles_to_graph, smiles_to_morgan_fp, resolve_smiles
+from wrangling.model_generator import smiles_to_graph, smiles_to_morgan_fp, resolve_smiles
 from rdkit.Chem import rdFingerprintGenerator
 import os
 import json

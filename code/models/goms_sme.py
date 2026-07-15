@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch_geometric.nn import TransformerConv, BatchNorm
 from egnn_pytorch import EGNN as EGNNLayer
 from torch_geometric.data import Data, Batch
-from neural_networks import FFNN
+from models.neural_networks import FFNN
 
 
 class FragEGNN(nn.Module):

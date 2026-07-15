@@ -126,24 +126,31 @@ def return_frags(mol, graph):
     bond_indices = [mol.GetBondBetweenAtoms(
         i, j).GetIdx() for i, j in bonds_to_break]
 
-    frag_mol = rdmolops.FragmentOnBonds(mol, bond_indices, addDummies=False)
-    atom_groups = Chem.GetMolFrags(frag_mol, asMols=False)
+    if len(bond_indices) > 0:
+        frag_mol = rdmolops.FragmentOnBonds(
+            mol, bond_indices, addDummies=False)
+        atom_groups = Chem.GetMolFrags(frag_mol, asMols=False)
 
-    fragment_graphs = []
+        fragment_graphs = []
 
-    for atom_idx_group in atom_groups:
-        subset = torch.tensor(atom_idx_group, dtype=torch.long)
-        sub_edge_index, sub_edge_attr = subgraph(
-            subset, graph.edge_index, graph.edge_attr,
-            relabel_nodes=True, num_nodes=graph.num_nodes
-        )
-        frag_data = Data(
-            x=graph.x[subset],
-            pos=graph.pos[subset],          # original global coords, untouched
-            edge_index=sub_edge_index,
-            edge_attr=sub_edge_attr,
-        )
-        fragment_graphs.append(frag_data)
+        for atom_idx_group in atom_groups:
+            subset = torch.tensor(atom_idx_group, dtype=torch.long)
+            sub_edge_index, sub_edge_attr = subgraph(
+                subset, graph.edge_index, graph.edge_attr,
+                relabel_nodes=True, num_nodes=graph.num_nodes
+            )
+            frag_data = Data(
+                x=graph.x[subset],
+                # original global coords, untouched
+                pos=graph.pos[subset],
+                edge_index=sub_edge_index,
+                edge_attr=sub_edge_attr,
+            )
+            fragment_graphs.append(frag_data)
+    else:
+        fragment_graphs = []
+        fragment_graphs.append(graph)
+        atom_groups = Chem.GetMolFrags(mol, asMols=False)
 
     atom_to_frag = {}
     for frag_id, atom_idx_group in enumerate(atom_groups):
@@ -179,11 +186,11 @@ def return_frags(mol, graph):
 def gen_data(dict_):
     # objective: return a bigger dict to be make one-liner GNN
     n_frags = len(dict_["frag_graphs"])
-    x_ = torch.tensor(dict_["frag_graphs"], dtype=torch.float)
+    frag_graphs = dict_["frag_graphs"]
 
     entire_graph = dict_['entire_graph']
     atom_to_frag = dict_['atom_to_frag_map']
-    cut_bonds = dict_['cut_bonds']
+    cut_bonds = dict_['gs_edges']
     atom_groups = dict_['atom_groups']
 
     pair_to_attr = {}
@@ -220,7 +227,7 @@ def gen_data(dict_):
         for f_idx in range(n_frags)
     ])
 
-    dict_['x'] = x_
+    dict_['frag_graphs'] = frag_graphs
     dict_['edge_index'] = e_idx
     dict_['edge_attr'] = edge_attr
     dict_['pos'] = pos
