@@ -52,10 +52,15 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
             continue
 
         fragmentation_output = smiles_to_graph(row[mol_label])
-        fragmentation_output = {} if fragmentation_output is None else fragmentation_output
+
+        if fragmentation_output is None:
+            #since model_generator.py outputs None when a molecule is skipped
+            continue
+
         mgraph = fragmentation_output["entire_graph"]
         sol_smiles = resolve_smiles(row[sol_label], SOLVENT_SMILES, CACHE_FILE)
         # sgraph = smiles_to_graph(row[sol_label])
+        
         if sol_smiles is None:
             print(f"Failed to resolve: '{row[sol_label]}'")
         if mgraph is None or sol_smiles is None:
