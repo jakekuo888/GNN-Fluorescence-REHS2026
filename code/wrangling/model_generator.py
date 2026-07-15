@@ -121,6 +121,9 @@ def resolve_smiles(name, dictionary, file):
         return name
 
 
+fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+
+
 def return_frags(mol, graph):
     bonds_to_break = [b[0] for b in BRICS.FindBRICSBonds(mol)]
     bond_indices = [mol.GetBondBetweenAtoms(
@@ -163,8 +166,6 @@ def return_frags(mol, graph):
         if frag_a != frag_b:
             gs_edges.add((min(frag_a, frag_b), max(frag_a, frag_b)))
 
-    fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
-
     frag_fps = [
         fp_gen.GetFingerprint(mol=mol, fromAtoms=list(g)) for g in atom_groups
     ]
@@ -206,7 +207,11 @@ def gen_data(dict_):
 
     src, dst, edge_attr_list = [], [], []
     for (f1, f2) in cut_bonds:
-        attr = pair_to_attr[(min(f1, f2), max(f1, f2))]
+        try:
+            attr = pair_to_attr[(min(f1, f2), max(f1, f2))]
+        except Exception as e:
+            print(f"CRITICAL ERROR: MAX(f1, f2) FAILED-- " + dict_["smiles"])
+            return None
         src += [f1, f2]
         dst += [f2, f1]
         edge_attr_list += [attr, attr]
@@ -237,15 +242,45 @@ def gen_data(dict_):
     return dict_
 
 
+def optimize_conformer(mol):
+    props = rdForceFieldHelpers.MMFFGetMoleculeProperties(mol)
+    if props is not None:
+        result = rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
+        if result == 0:
+            return mol, "MMFF"
+    # MMFF unparameterized or failed to converge -- fall back to UFF
+    result = rdForceFieldHelpers.UFFOptimizeMolecule(mol)
+    if result == 0:
+        return mol, "UFF"
+    # Neither converged -- keep the raw embedded geometry rather than discard
+    return mol, "unoptimized"
+
+
+def embed_conformer(mol):
+    params = rdDistGeom.ETKDGv3()
+    params.useRandomCoords = True
+    params.maxIterations = 1000
+    params.ignoreSmoothingFailures = True
+
+    conf_id = rdDistGeom.EmbedMolecule(mol, params)
+    if conf_id == -1:
+        # last resort -- pure random-distance-geometry, no torsion knowledge
+        conf_id = rdDistGeom.EmbedMolecule(
+            mol, useRandomCoords=True, maxAttempts=2000)
+
+    return conf_id  # still -1 if truly unembeddable -- caller must check
+
+
+CACHE_FILE = './data/solvent_cache.json'
+if os.path.exists(CACHE_FILE):
+    with open(CACHE_FILE, 'r') as f:
+        SOLVENT_SMILES = json.load(f)
+else:
+    SOLVENT_SMILES = {}
+
+
 def smiles_to_graph(smiles):
     blocker = rdBase.BlockLogs()
-
-    CACHE_FILE = './data/solvent_cache.json'
-    if os.path.exists(CACHE_FILE):
-        with open(CACHE_FILE, 'r') as f:
-            SOLVENT_SMILES = json.load(f)
-    else:
-        SOLVENT_SMILES = {}
 
     NUM_NODE_FEATURES = 27
     NUM_EDGE_FEATURES = 6
@@ -260,6 +295,28 @@ def smiles_to_graph(smiles):
             return None
 
     mol = Chem.AddHs(mol)
+<<<<<<< HEAD
+
+    conf_id = embed_conformer(mol)
+    if conf_id == -1:
+        print(f"CRITICAL ERROR: CONFORMER FAILED-- {smiles}")
+        return None
+
+    try:
+        mol, method = optimize_conformer(mol)
+        if method == "unoptimized":
+            print(
+                f"WARNING: MOLECULE IS UNOPTIMIZED, BUT SAFELY PROCEEDS-- {smiles}")
+    except Exception as e:
+        print(f"CRITICAL ERROR: MMFF FAILED-- {smiles}")
+        return None
+
+    try:
+        conf = mol.GetConformer()
+    except Exception as e:
+        print(f"CRITICAL ERROR: CONFORMER FAILED-- {smiles}")
+        return None
+=======
     rdDistGeom.EmbedMolecule(mol)
     #print(f"If this is the last message, the offending smiles is: {smiles}")
     
@@ -281,7 +338,9 @@ def smiles_to_graph(smiles):
         print(f"No valid conformer: {smiles} \n ERR: \n {e} \n")
         return None
 
+>>>>>>> 059cf9acdc64bf5e80947ed50238540ba9b0268c
     positions = conf.GetPositions()
+    positions = torch.tensor(positions, dtype=torch.float)
 
     rdPartialCharges.ComputeGasteigerCharges(mol)
 
