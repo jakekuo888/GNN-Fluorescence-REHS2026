@@ -163,7 +163,8 @@ def return_frags(mol, graph):
     gs_edges = set()
     for atom_i, atom_j in bonds_to_break:
         frag_a, frag_b = atom_to_frag[atom_i], atom_to_frag[atom_j]
-        gs_edges.add((min(frag_a, frag_b), max(frag_a, frag_b)))
+        if frag_a != frag_b:
+            gs_edges.add((min(frag_a, frag_b), max(frag_a, frag_b)))
 
     frag_fps = [
         fp_gen.GetFingerprint(mol=mol, fromAtoms=list(g)) for g in atom_groups
