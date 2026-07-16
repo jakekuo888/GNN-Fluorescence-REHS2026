@@ -121,6 +121,33 @@ def resolve_smiles(name, dictionary, file):
         return name
 
 
+def get_fallback_bond_indices(mol: Chem.Mol) -> list[int]:
+    bonds_to_break = [b[0] for b in BRICS.FindBRICSBonds(mol)]
+
+    if bonds_to_break:
+        # Extract the bond IDs for BRICS
+        bond_indices = [mol.GetBondBetweenAtoms(
+            i, j).GetIdx() for i, j in bonds_to_break]
+        return bond_indices
+
+    # 2. Fallback to Fraggle style if BRICS found 0 bonds
+    fraggle_bond_indices = []
+
+    # FraggleSim relies primarily on breaking non-ring (acyclic) bonds
+    for bond in mol.GetBonds():
+        # Fraggle looks for single acyclic cuts that don't isolate single atoms
+        # (like cutting a terminal methyl off). We mimic that logic here:
+        if not bond.IsInRing():
+            begin_atom = bond.GetBeginAtom()
+            end_atom = bond.GetEndAtom()
+
+            # Ensure we aren't just chopping off a terminal heavy atom (e.g., -CH3, -F, -OH)
+            if begin_atom.GetDegree() > 1 and end_atom.GetDegree() > 1:
+                fraggle_bond_indices.append(bond.GetIdx())
+
+    return fraggle_bond_indices
+
+
 fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
 
@@ -151,8 +178,13 @@ def return_frags(mol, graph):
             )
             fragment_graphs.append(frag_data)
     else:
-        fragment_graphs = []
-        fragment_graphs.append(graph)
+        frag_data = Data(
+            x=graph.x,
+            pos=graph.pos,
+            edge_index=graph.edge_index,
+            edge_attr=graph.edge_attr,
+        )
+        fragment_graphs = [frag_data]
         atom_groups = Chem.GetMolFrags(mol, asMols=False)
 
     atom_to_frag = {}

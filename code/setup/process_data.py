@@ -125,7 +125,7 @@ def collate_fn(mol_dicts):
         # remember how many, in this exact order
         frags_per_mol.append(len(frags))
 
-    atom_batch = Batch.from_data_list(all_fragments)
+    atom_batch = Batch.from_data_list(all_fragments, exclude_keys=["smiles"])
     return atom_batch, frags_per_mol, mol_dicts
 
 

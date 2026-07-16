@@ -63,7 +63,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = Model(node_features, edge_features, 64,
-                  gs_edge_features, train_solv_features)
+                  gs_edge_features, train_solv_features).to(device)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=0.001, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -80,9 +80,18 @@ if __name__ == "__main__":
         for data, frags_per_mol, mol_dicts in loader:
             data.to(device)
 
+            mol_dicts = [
+                {
+                    **d,
+                    "edge_index": d["edge_index"].to(device),
+                    "edge_attr": d["edge_attr"].to(device),
+                }
+                for d in mol_dicts
+            ]
+
             sol_fps = [d['sol_fp'] for d in mol_dicts]
             sol_fps = np.array(sol_fps)
-            sol_fp = torch.tensor(sol_fps, dtype=torch.float).to(device)
+            sol_fp = torch.tensor(sol_fps, dtype=torch.float, device=device)
             # sol_fp = torch.tensor(np.array(data.sol_fp), dtype=torch.float).to(device)
             _, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
                            data.batch, frags_per_mol, mol_dicts, sol_fp)
@@ -110,6 +119,15 @@ if __name__ == "__main__":
 
             for data, frags_per_mol, mol_dicts in loader:
                 data.to(device)
+
+                mol_dicts = [
+                    {
+                        **d,
+                        "edge_index": d["edge_index"].to(device),
+                        "edge_attr": d["edge_attr"].to(device),
+                    }
+                    for d in mol_dicts
+                ]
 
                 sol_fp = torch.tensor(np.array(data.sol_fp),
                                       dtype=torch.float).to(device)
