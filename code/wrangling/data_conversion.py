@@ -7,6 +7,7 @@ import os
 import json
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from tqdm import tqdm
 
 
 def is_null_graph(graph):
@@ -52,23 +53,26 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
     for sol_name in unique_solvents:
         resolve_smiles(sol_name, SOLVENT_SMILES, CACHE_FILE)
 
-    mol_smiles_list = [row[mol_label] for row in valid_rows]
-    m_dicts = [None] * len(valid_rows)
+    unique_mol_smiles = list({row[mol_label] for row in valid_rows})
+
+    smiles_to_dict = {}
     with ProcessPoolExecutor() as executor:
-        futures = {executor.submit(smiles_to_graph, s): i for i, s in enumerate(mol_smiles_list)}
-        for fut in as_completed(futures):
-            i = futures[fut]
-            m_dicts[i] = fut.result()
+        futures = {executor.submit(smiles_to_graph, s): s for s in unique_mol_smiles}
+
+        for fut in tqdm(as_completed(futures), total=len(futures), desc="Generating molecular graphs"):
+            s = futures[fut]
+            smiles_to_dict[s] = fut.result()
 
     final_m_dicts, s_prints, y_values = [], [], []
-    for i, row in enumerate(valid_rows):
-        if m_dicts[i] is None:
+    for row in valid_rows:
+        mol_dict = smiles_to_dict.get(row[mol_label])
+        if mol_dict is None:
             continue
         sol_smiles = resolve_smiles(row[sol_label], SOLVENT_SMILES, CACHE_FILE)
         if sol_smiles is None:
             print(f"Failed to resolve: '{row[sol_label]}'")
             continue
-        final_m_dicts.append(m_dicts[i])
+        final_m_dicts.append(mol_dict)
         s_prints.append(smiles_to_morgan_fp(fp_gen, sol_smiles))
         y_values.append(row[predicted_name])
     # export

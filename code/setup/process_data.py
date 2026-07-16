@@ -101,7 +101,7 @@ def generate_graphs_labels(chosen_option, generate_data=False, y_mean=None, y_st
         # View(-1,1) returns size [1,1] because y_normalized is a tensor
         d["y_normalized"] = label.view(-1, 1)
 
-    for data, fp in zip(molecules_dicts, solvents_list):
+    for d, fp in zip(molecules_dicts, solvents_list):
         d["sol_fp"] = fp
 
     smiles_for_similarity = []

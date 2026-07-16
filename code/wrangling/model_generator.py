@@ -193,9 +193,15 @@ def gen_data(dict_):
     atom_to_frag = dict_['atom_to_frag_map']
     cut_bonds = dict_['gs_edges']
     atom_groups = dict_['atom_groups']
+    smiles = dict_['smiles']
 
     pair_to_attr = {}
-    src_all, dst_all = entire_graph.edge_index
+    try:
+        src_all, dst_all = entire_graph.edge_index
+    except Exception as e:
+        print(f"CRITICAL ERROR IN SRC, DST: {smiles}")
+        return None
+
     for k in range(entire_graph.edge_index.size(1)):
         a1, a2 = src_all[k].item(), dst_all[k].item()
         f1, f2 = atom_to_frag[a1], atom_to_frag[a2]
@@ -241,17 +247,24 @@ def gen_data(dict_):
     return dict_
 
 
-def optimize_conformer(mol):
+def optimize_conformer(mol, max_iters=2000):
     props = rdForceFieldHelpers.MMFFGetMoleculeProperties(mol)
     if props is not None:
-        result = rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
+        result = rdForceFieldHelpers.MMFFOptimizeMolecule(
+            mol, maxIters=max_iters)
         if result == 0:
             return mol, "MMFF"
-    # MMFF unparameterized or failed to converge -- fall back to UFF
-    result = rdForceFieldHelpers.UFFOptimizeMolecule(mol)
+        elif result == 1:
+            # ran out of iterations, not a real failure -- geometry is still meaningfully relaxed
+            return mol, "MMFF_partial"
+
+    # only reach here on a genuine parameter failure (-1), not a slow-converging molecule
+    result = rdForceFieldHelpers.UFFOptimizeMolecule(mol, maxIters=max_iters)
     if result == 0:
         return mol, "UFF"
-    # Neither converged -- keep the raw embedded geometry rather than discard
+    elif result == 1:
+        return mol, "UFF_partial"
+
     return mol, "unoptimized"
 
 
@@ -294,7 +307,6 @@ def smiles_to_graph(smiles):
             return None
 
     mol = Chem.AddHs(mol)
-<<<<<<< HEAD
 
     conf_id = embed_conformer(mol)
     if conf_id == -1:
@@ -315,29 +327,6 @@ def smiles_to_graph(smiles):
     except Exception as e:
         print(f"CRITICAL ERROR: CONFORMER FAILED-- {smiles}")
         return None
-=======
-    rdDistGeom.EmbedMolecule(mol)
-    #print(f"If this is the last message, the offending smiles is: {smiles}")
-    
-    try:
-        rdForceFieldHelpers.MMFFOptimizeMolecule(mol)
-    except Exception as e:
-        try:
-            #print(f"ERROR WITH RUNNING IN MMFF: \n {e} \n Offender: {smiles} \n \n Attempting UFF instead")
-            mol = Chem.AddHs(Chem.MolFromSmiles(str(smiles)))
-            rdDistGeom.EmbedMolecule(mol, randomSeed=42)
-            rdForceFieldHelpers.UFFOptimizeMolecule(mol)
-        except Exception as e_:
-            #print(f"ERR. RUNNING UFF: \n \t{e_} \n \n SKIPPING MOL: {smiles}")
-            return None
-
-    try:
-        conf = mol.GetConformer()
-    except Exception as e:
-        print(f"No valid conformer: {smiles} \n ERR: \n {e} \n")
-        return None
-
->>>>>>> 059cf9acdc64bf5e80947ed50238540ba9b0268c
     positions = conf.GetPositions()
     positions = torch.tensor(positions, dtype=torch.float)
 

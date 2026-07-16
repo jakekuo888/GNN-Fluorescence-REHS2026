@@ -29,7 +29,7 @@ sys.path.append(os.path.join(root_dir, 'data-wrangling'))
 sys.path.append(os.path.join(root_dir, 'plots-visuals'))
 
 if __name__ == "__main__":
-    re_generate_data = True
+    re_generate_data = False
 
     # D4C
     molecules_dicts, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(
@@ -80,8 +80,10 @@ if __name__ == "__main__":
         for data, frags_per_mol, mol_dicts in loader:
             data.to(device)
 
-            sol_fp = torch.tensor(np.array(data.sol_fp),
-                                  dtype=torch.float).to(device)
+            sol_fps = [d['sol_fp'] for d in mol_dicts]
+            sol_fps = np.array(sol_fps)
+            sol_fp = torch.tensor(sol_fps, dtype=torch.float).to(device)
+            # sol_fp = torch.tensor(np.array(data.sol_fp), dtype=torch.float).to(device)
             _, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
                            data.batch, frags_per_mol, mol_dicts, sol_fp)
             y = torch.tensor([d["y_norm"] for d in mol_dicts],

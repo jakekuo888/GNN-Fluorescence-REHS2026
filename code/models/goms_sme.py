@@ -67,9 +67,11 @@ class GAT(nn.Module):
 
     def forward(self, x, edge_index, edge_attr, batch):
         for layer in self.layers:
-            x = layer(x, edge_index, edge_attr)
             if isinstance(layer, BatchNorm):
                 x = torch.relu(x)
+                x = layer(x)
+            else:
+                x = layer(x, edge_index, edge_attr)
 
         graph_readout = global_mean_pool(x, batch)
 
