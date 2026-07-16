@@ -5,6 +5,7 @@ from wrangling.model_generator import smiles_to_graph, smiles_to_morgan_fp, reso
 from rdkit.Chem import rdFingerprintGenerator
 import os
 import json
+import pickle
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
@@ -55,13 +56,52 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
 
     unique_mol_smiles = list({row[mol_label] for row in valid_rows})
 
-    smiles_to_dict = {}
-    with ProcessPoolExecutor() as executor:
-        futures = {executor.submit(smiles_to_graph, s): s for s in unique_mol_smiles}
+    SHARD_SIZE = 500
+    shard_files = []
+    output_dir = "temp_shards"
+    os.makedirs(output_dir, exist_ok=True)
 
-        for fut in tqdm(as_completed(futures), total=len(futures), desc="Generating molecular graphs"):
-            s = futures[fut]
-            smiles_to_dict[s] = fut.result()
+    # 1. Process molecules in shards of 1,000
+    for i in range(0, len(unique_mol_smiles), SHARD_SIZE):
+        shard_smiles = unique_mol_smiles[i: i + SHARD_SIZE]
+        shard_index = i // SHARD_SIZE
+        shard_path = os.path.join(output_dir, f"shard_{shard_index}.pickle")
+
+        shard_dict = {}
+
+        print(
+            f"\nProcessing shard {shard_index + 1} (molecules {i} to {i + len(shard_smiles)})...")
+
+        with ProcessPoolExecutor() as executor:
+            futures = {executor.submit(
+                smiles_to_graph, s): s for s in shard_smiles}
+
+            for fut in tqdm(as_completed(futures), total=len(futures), desc=f"Shard {shard_index + 1}"):
+                s = futures[fut]
+                shard_dict[s] = fut.result()
+
+        # Save the current shard to disk immediately
+        # Note: If your graph objects aren't JSON-serializable, use `pickle.dump` instead.
+        with open(shard_path, 'bw') as f:
+            pickle.dump(shard_dict, f)
+
+        shard_files.append(shard_path)
+
+    # 2. Combine all shards at the end
+    print("\nCombining all shards into final dictionary...")
+    smiles_to_dict = {}
+
+    for shard_path in shard_files:
+        with open(shard_path, 'br') as f:
+            shard_data = pickle.load(f)
+            smiles_to_dict.update(shard_data)
+
+    # Optional: Clean up the shard file after merging to save disk space
+    os.remove(shard_path)
+
+    # Optional: Clean up the empty temp directory
+    if os.path.exists(output_dir) and not os.listdir(output_dir):
+        os.rmdir(output_dir)
 
     final_m_dicts, s_prints, y_values = [], [], []
     for row in valid_rows:

@@ -9,6 +9,9 @@ import cirpy
 from rdkit import rdBase
 from rdkit.Chem import BRICS, rdmolops
 from torch_geometric.utils import subgraph
+from random import randint
+
+import datamol as dm
 
 import json
 import os
@@ -121,17 +124,18 @@ def resolve_smiles(name, dictionary, file):
         return name
 
 
-def get_fallback_bond_indices(mol: Chem.Mol) -> list[int]:
+def get_fallback_bond_indices(mol: Chem.Mol):
     bonds_to_break = [b[0] for b in BRICS.FindBRICSBonds(mol)]
 
     if bonds_to_break:
         # Extract the bond IDs for BRICS
         bond_indices = [mol.GetBondBetweenAtoms(
             i, j).GetIdx() for i, j in bonds_to_break]
-        return bond_indices
+        return bonds_to_break, bond_indices, "brics"
 
     # 2. Fallback to Fraggle style if BRICS found 0 bonds
     fraggle_bond_indices = []
+    fraggle_bonds_to_break = []
 
     # FraggleSim relies primarily on breaking non-ring (acyclic) bonds
     for bond in mol.GetBonds():
@@ -143,9 +147,11 @@ def get_fallback_bond_indices(mol: Chem.Mol) -> list[int]:
 
             # Ensure we aren't just chopping off a terminal heavy atom (e.g., -CH3, -F, -OH)
             if begin_atom.GetDegree() > 1 and end_atom.GetDegree() > 1:
+                atom_pair = (begin_atom.GetIdx(), end_atom.GetIdx())
+                fraggle_bonds_to_break.append(atom_pair)
                 fraggle_bond_indices.append(bond.GetIdx())
 
-    return fraggle_bond_indices
+    return fraggle_bonds_to_break, fraggle_bond_indices, "fraggle"
 
 
 fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
