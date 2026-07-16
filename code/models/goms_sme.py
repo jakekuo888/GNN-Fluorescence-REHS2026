@@ -55,21 +55,23 @@ class GAT(nn.Module):
         self.heads = heads
         self.dropout = dropout
 
+        head_out_dim = self.hidden_channels // self.heads
+
         self.layers = nn.ModuleList()
-        self.layers.append(TransformerConv(in_channels=self.in_dim, out_channels=self.hidden_channels,
+        self.layers.append(TransformerConv(in_channels=self.in_dim, out_channels=head_out_dim,
                            edge_dim=self.edge_dim, heads=self.heads, dropout=self.dropout))
         self.layers.append(BatchNorm(self.hidden_channels))
 
         for _ in range(n_layers-1):
-            self.layers.append(TransformerConv(in_channels=self.hidden_channels, out_channels=self.hidden_channels,
+            self.layers.append(TransformerConv(in_channels=self.hidden_channels, out_channels=head_out_dim,
                                edge_dim=self.edge_dim, heads=self.heads, dropout=self.dropout))
             self.layers.append(BatchNorm(self.hidden_channels))
 
     def forward(self, x, edge_index, edge_attr, batch):
         for layer in self.layers:
             if isinstance(layer, BatchNorm):
-                x = torch.relu(x)
                 x = layer(x)
+                x = torch.relu(x)
             else:
                 x = layer(x, edge_index, edge_attr)
 
@@ -89,7 +91,7 @@ class Model(nn.Module):
                        hidden_channels, num_layers)
         self.sol_ffnn = FFNN(solv_features, hidden_channels,
                              hidden_sizes=[128, 128, 128])
-        self.ffnn = FFNN(hidden_channels, 1, [128, 128, 128])
+        self.ffnn = FFNN(2*hidden_channels, 1, [128, 128, 128])
 
     def forward(self, x, pos, edge_index, edge_attr, batch, frags_per_mol, mol_dicts, solv_morgan):
         frag_vecs = self.egnn(x, pos, edge_index, edge_attr, batch)

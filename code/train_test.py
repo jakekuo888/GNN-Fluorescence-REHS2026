@@ -86,7 +86,7 @@ if __name__ == "__main__":
             # sol_fp = torch.tensor(np.array(data.sol_fp), dtype=torch.float).to(device)
             _, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
                            data.batch, frags_per_mol, mol_dicts, sol_fp)
-            y = torch.tensor([d["y_norm"] for d in mol_dicts],
+            y = torch.tensor([d["y_normalized"] for d in mol_dicts],
                              dtype=torch.float).to(device).unsqueeze(-1)
 
             loss = criterion(out, y)
@@ -115,7 +115,7 @@ if __name__ == "__main__":
                                       dtype=torch.float).to(device)
                 vector_out, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
                                         data.batch, frags_per_mol, mol_dicts, sol_fp)
-                y = torch.tensor([d["y_norm"] for d in mol_dicts],
+                y = torch.tensor([d["y_normalized"] for d in mol_dicts],
                                  dtype=torch.float).to(device).unsqueeze(-1)
 
                 loss = criterion(out, y)
