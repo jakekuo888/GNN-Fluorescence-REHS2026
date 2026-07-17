@@ -16,8 +16,7 @@ import datamol as dm
 import json
 import os
 
-# https://www.blopig.com/blog/2022/02/how-to-turn-a-smiles-string-into-a-molecular-graph-for-pytorch-geometric/
-
+fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
 def get_atom_features(atom):
     permitted_atoms = ['C', 'N', 'O', 'S', 'F', 'Cl',
@@ -152,9 +151,6 @@ def get_fallback_bond_indices(mol: Chem.Mol):
                 fraggle_bond_indices.append(bond.GetIdx())
 
     return fraggle_bonds_to_break, fraggle_bond_indices, "fraggle"
-
-
-fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 
 
 def return_frags(mol, graph):
@@ -323,6 +319,7 @@ def embed_conformer(mol):
 
 
 CACHE_FILE = './data/solvent_cache.json'
+
 if os.path.exists(CACHE_FILE):
     with open(CACHE_FILE, 'r') as f:
         SOLVENT_SMILES = json.load(f)
@@ -349,22 +346,21 @@ def smiles_to_graph(smiles):
 
     conf_id = embed_conformer(mol)
     if conf_id == -1:
-        print(f"CRITICAL ERROR: CONFORMER FAILED-- {smiles}")
+        print(f"\n Error: Conformer failed - {smiles}")
         return None
 
     try:
         mol, method = optimize_conformer(mol)
         if method == "unoptimized":
-            print(
-                f"WARNING: MOLECULE IS UNOPTIMIZED, BUT SAFELY PROCEEDS-- {smiles}")
+            print(f"\n Warning: Unoptimized molecule, can proceed safely - {smiles}")
     except Exception as e:
-        print(f"CRITICAL ERROR: MMFF FAILED-- {smiles}")
+        print(f"\n Error: MMFF failed - {smiles}")
         return None
 
     try:
         conf = mol.GetConformer()
     except Exception as e:
-        print(f"CRITICAL ERROR: CONFORMER FAILED-- {smiles}")
+        print(f"n Error: Conformer failed - {smiles}")
         return None
     positions = conf.GetPositions()
     positions = torch.tensor(positions, dtype=torch.float)

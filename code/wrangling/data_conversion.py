@@ -61,7 +61,14 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
     output_dir = "temp_shards"
     os.makedirs(output_dir, exist_ok=True)
 
-    # 1. Process molecules in shards of 1,000
+    #Process molecules in shards of SHARD_SIZE
+    
+    print("QUICK INFO:")
+    print(f"\n Est. total number of shards: {len(unique_mol_smiles)//SHARD_SIZE + 1}")
+    print(f" There are {len(unique_mol_smiles)} to process in total.")
+    print(f" Shard size of {SHARD_SIZE}. Temp shards are located within ./{output_dir}/...")
+    print("-------------------\n")
+
     for i in range(0, len(unique_mol_smiles), SHARD_SIZE):
         shard_smiles = unique_mol_smiles[i: i + SHARD_SIZE]
         shard_index = i // SHARD_SIZE
@@ -73,8 +80,7 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
             f"\nProcessing shard {shard_index + 1} (molecules {i} to {i + len(shard_smiles)})...")
 
         with ProcessPoolExecutor() as executor:
-            futures = {executor.submit(
-                smiles_to_graph, s): s for s in shard_smiles}
+            futures = {executor.submit(smiles_to_graph, s): s for s in shard_smiles}
 
             for fut in tqdm(as_completed(futures), total=len(futures), desc=f"Shard {shard_index + 1}"):
                 s = futures[fut]
