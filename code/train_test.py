@@ -19,7 +19,7 @@ from models.goms_sme import FragEGNN
 from setup.process_data import absorption_data_options, generate_graphs_labels, FragmentDataset, collate_fn
 
 # EASY CONTROLS vvv
-n_epochs = 1
+n_epochs = 100
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 # EASY CONTROLS ^^^
@@ -93,12 +93,33 @@ if __name__ == "__main__":
             sol_fps = np.array(sol_fps)
             sol_fp = torch.tensor(sol_fps, dtype=torch.float, device=device)
             # sol_fp = torch.tensor(np.array(data.sol_fp), dtype=torch.float).to(device)
-            _, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
-                           data.batch, frags_per_mol, mol_dicts, sol_fp)
+            final_readout, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
+                                       data.batch, frags_per_mol, mol_dicts, sol_fp)
+
+            """if torch.isnan(final_readout).any():
+                print("--- NaN Detected in Readout! ---")
+                print("Batch size:", data.num_graphs if hasattr(
+                    data, 'num_graphs') else "Unknown")
+                print("Number of edges in batch:",
+                      data.edge_index.shape[1] if data.edge_index is not None else 0)
+                # Check if a specific graph in the batch has 0 nodes or edges
+                if hasattr(data, 'batch'):
+                    for i in range(data.num_graphs):
+                        num_nodes = (data.batch == i).sum().item()
+                        print(f"Graph {i} has {num_nodes} nodes.")"""
+
             y = torch.tensor([d["y_normalized"] for d in mol_dicts],
                              dtype=torch.float).to(device).unsqueeze(-1)
 
             loss = criterion(out, y)
+
+            if not torch.isfinite(loss) or loss.item() > 1000.0:
+                offending_smiles = [d["smiles"] for d in mol_dicts]
+                print(
+                    f"!!! Skipping batch, loss={loss.item()}. Molecules in batch: {offending_smiles}")
+                opt.zero_grad()
+                continue  # skip this batch entirely -- don't let it corrupt the weights
+
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -129,8 +150,10 @@ if __name__ == "__main__":
                     for d in mol_dicts
                 ]
 
-                sol_fp = torch.tensor(np.array(data.sol_fp),
-                                      dtype=torch.float).to(device)
+                sol_fps = [d['sol_fp'] for d in mol_dicts]
+                sol_fps = np.array(sol_fps)
+                sol_fp = torch.tensor(
+                    sol_fps, dtype=torch.float, device=device)
                 vector_out, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
                                         data.batch, frags_per_mol, mol_dicts, sol_fp)
                 y = torch.tensor([d["y_normalized"] for d in mol_dicts],

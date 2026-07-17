@@ -7,8 +7,16 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import TransformerConv, BatchNorm
 from egnn_pytorch import EGNN as EGNNLayer
+from egnn_pytorch import EGNN_Sparse
 from torch_geometric.data import Data, Batch
 from models.neural_networks import FFNN
+
+
+def check_nan(name, tensor):
+    if torch.isnan(tensor).any() or torch.isinf(tensor).any():
+        print(f"!!! NaN/Inf first appears at: {name}")
+        return True
+    return False
 
 
 class FragEGNN(nn.Module):
@@ -22,24 +30,37 @@ class FragEGNN(nn.Module):
         self.num_layers = num_layers
 
         self.layers = nn.ModuleList([
-            EGNNLayer(dim=node_features, edge_dim=edge_features) for _ in range(num_layers)
+            EGNN_Sparse(feats_dim=node_features,
+                        edge_attr_dim=edge_features,
+                        norm_coors=True,
+                        coor_weights_clamp_value=2.,
+                        aggr='mean') for _ in range(num_layers)
         ])
 
     def forward(self, x, pos, edge_index, edge_attr, batch):
-        feats, mask = to_dense_batch(x, batch)
-        coors, _ = to_dense_batch(pos, batch)
+        # 1. Store the coordinate dimensionality (typically 3 for xyz)
+        pos_dim = pos.size(-1)
 
-        edges = to_dense_adj(
-            edge_index,
-            batch=batch,
-            edge_attr=edge_attr
-        )
+        # 2. Concatenate coordinates and features into a single tensor
+        # CRITICAL: EGNN_Sparse expects coordinates in the first positions: x[:, :pos_dim]
+        x_combined = torch.cat([pos, x], dim=-1)
 
+        # 3. Propagate through the EGNN_Sparse layers
         for layer in self.layers:
-            feats, coors = layer(feats, coors, edges, mask=mask)
+            x_combined = layer(
+                x=x_combined,
+                edge_index=edge_index,
+                edge_attr=edge_attr
+            )
 
-        mask_f = mask.unsqueeze(-1).float()
-        frag_vectors = global_mean_pool(feats[mask], batch)
+        # 4. Separate the updated node features from the coordinates
+        # The layers maintain the same concatenated structure [coors, feats]
+        feats = x_combined[:, pos_dim:]
+        # (Keep if you need updated positions later)
+        coors = x_combined[:, :pos_dim]
+
+        # 5. Pool the updated node features across the graph batch
+        frag_vectors = global_mean_pool(feats, batch)
 
         return frag_vectors
 
