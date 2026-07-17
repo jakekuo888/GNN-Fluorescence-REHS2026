@@ -22,6 +22,7 @@ from setup.process_data import absorption_data_options, generate_graphs_labels, 
 n_epochs = 100
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
+re_generate_data = False
 # EASY CONTROLS ^^^
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -29,7 +30,6 @@ sys.path.append(os.path.join(root_dir, 'data-wrangling'))
 sys.path.append(os.path.join(root_dir, 'plots-visuals'))
 
 if __name__ == "__main__":
-    re_generate_data = True
 
     # D4C
     molecules_dicts, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(
