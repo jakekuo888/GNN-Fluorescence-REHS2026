@@ -5,15 +5,15 @@ from torch_geometric.data import Data, Batch
 
 def sme_pool(x, batch, num_mols, mask = None):
 	#Make sure to skip molecules with only one fragment total
-	if mask is None:
-		#Rm none if mask = None
-		mask = torch.ones(x.size(0), 1, device = x.device)
-	else:
-		mask = mask.view(-1, 1).float()
+    if mask is None:
+        #Rm none if mask = None
+        mask = torch.ones(x.size(0), 1, device = x.device)
+    else:
+        mask = mask.view(-1, 1).float()
 
-	summed = torch.zeros(num_mols, x.size(1), device = x.device)
-	summed = index_add_(0, batch, x * mask)
-	counts = torch.bincount(batch, minlength=num_mols).clamp(min=1).unsqueeze(-1).float()
+    summed = torch.zeros(num_mols, x.size(1), device = x.device)
+    summed.index_add_(0, batch, x * mask)
+    counts = torch.bincount(batch, minlength=num_mols).clamp(min=1).unsqueeze(-1).float()
 
     return summed / counts
 
@@ -52,7 +52,7 @@ def sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, max_c
     num_mols = len(frags_per_mol)
 
     # ---- 3. Full (unmasked) prediction, per molecule ----
-    mol_readout_full = _masked_mean_pool(x, gs_batch.batch, num_mols)
+    mol_readout_full = sme_pool(x, gs_batch.batch, num_mols)
     Y_full = model.ffnn(torch.cat([mol_readout_full, solv_readout], dim=-1))  # [num_mols, 1]
 
     # ---- 4. Per-fragment (and optionally combination) attributions ----
@@ -66,7 +66,7 @@ def sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, max_c
             mask = torch.ones(x.size(0), device=device)
             mask[gid] = 0.0
 
-            mol_readout_masked = _masked_mean_pool(x, gs_batch.batch, num_mols, mask)
+            mol_readout_masked = sme_pool(x, gs_batch.batch, num_mols, mask)
             Y_masked = model.ffnn(torch.cat([mol_readout_masked, solv_readout], dim=-1))
 
             attributions[local_i] = (Y_full[mol_idx] - Y_masked[mol_idx]).item()
@@ -90,7 +90,7 @@ def sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, max_c
                 mask = torch.ones(x.size(0), device=device)
                 for local_i in combo:
                     mask[global_frag_ids[local_i]] = 0.0
-                mol_readout_masked = _masked_mean_pool(x, gs_batch.batch, num_mols, mask)
+                mol_readout_masked = sme_pool(x, gs_batch.batch, num_mols, mask)
                 Y_masked = model.ffnn(torch.cat([mol_readout_masked, solv_readout], dim=-1))
                 combo_attributions[combo] = (Y_full[mol_idx] - Y_masked[mol_idx]).item()
 

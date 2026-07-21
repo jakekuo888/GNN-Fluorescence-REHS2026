@@ -20,7 +20,7 @@ from setup.process_data import absorption_data_options, generate_graphs_labels, 
 from models.sme import sme_attribution
 
 # EASY CONTROLS vvv
-n_epochs = 100
+n_epochs = 2
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 re_generate_data = False
@@ -153,6 +153,8 @@ if __name__ == "__main__":
     train_vectors_for_similarity = []
     test_vectors_for_similarity = []
     test_losses_for_similarity = []
+    train_smiles_collected = []
+    test_smiles_collected = []
 
     # Train has the evaluation mode (output actual vs predicted for sample) and the non-evaluation mode (just avg MAE output)
 
@@ -211,10 +213,12 @@ if __name__ == "__main__":
 
                 if collect_plot_data and not is_test_set:
                     train_vectors_for_similarity.extend(vector_out.unbind(0))
+                    train_smiles_collected.extend([d["smiles"] for d in mol_dicts])
                 elif collect_plot_data:
                     test_vectors_for_similarity.extend(vector_out.unbind(0))
                     test_losses_for_similarity.extend([torch.abs(p - t).item()
                                                        for p, t in zip(pred_actual, target_actual)])
+                    test_smiles_collected.extend([d["smiles"] for d in mol_dicts])
 
                 if compute_mae:
                     num_graphs = data.num_graphs
@@ -254,7 +258,16 @@ if __name__ == "__main__":
     print("UNDERGOING TESTING")
     print("-" * 45)
 
-    test_avg_mae = test(model, test_loader, y_mean, y_std, compute_mae=True)
+    # NOTE: collect_plot_data=True populates train_vectors_for_similarity /
+    # test_vectors_for_similarity / test_losses_for_similarity, which the
+    # similarity scatter plots below need. Previously these were never
+    # populated (all test() calls used the collect_plot_data default of
+    # False), so the plotting calls crashed with an empty-list np.stack error.
+    test(model, train_loader, y_mean, y_std, compute_mae=False,
+         is_test_set=False, collect_plot_data=True)
+
+    test_avg_mae = test(model, test_loader, y_mean, y_std, compute_mae=True,
+                        is_test_set=True, collect_plot_data=True)
     print(
         f"TEST AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n-------------------------------")
 
@@ -262,7 +275,7 @@ if __name__ == "__main__":
     print(
         f"EXTERNAL AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n-------------------------------")
 
-    print("COMPUTING SME ATTR. ON TEST SET")
+    print("\n \n COMPUTING SME ATTR. ON TEST SET")
     model.eval()
     all_attr = []
     with torch.no_grad():
@@ -283,6 +296,9 @@ if __name__ == "__main__":
             batch_attrs = sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, combo_search=True)
             all_attr.extend(batch_attrs)
 
+    print("COMPUTING SME DONE; CONTINUING.")
+
+
     with open("./data/plot-data/sme.txt", "w") as f:
         print(all_attr, file = f)
 
@@ -296,15 +312,13 @@ if __name__ == "__main__":
             subprocess.run([sys.executable, "./code/plotting/plot-loss.py"])
             print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
 
-        print("Creating plotting loss visuals \n ...")
-        subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
-        print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
+            print("Creating scatterplot of the error vs similarity (vectors) \n ...")
+            plot_vector_similarity_loss_graph(
+                train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
+            print("Scatterplot successfully created! \n Check plots-visuals/new-plots")
 
-        print("Creating scatterplot of the error vs similarity (vectors) \n ...")
-        plot_vector_similarity_loss_graph(
-            train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
-        print("Scatterplot successfully created! \n Check plots-visuals/new-plots")
+            print("Creating scatterplot of the error vs similarity (smiles) \n ...")
+            plot_smiles_similarity_loss_graph(
+                train_smiles_collected, test_smiles_collected, test_losses_for_similarity)
 
-        print("Creating scatterplot of the error vs similarity (smiles) \n ...")
-        plot_smiles_similarity_loss_graph(
-            train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)
+    print("PROCESS DONE. \n EXITING.")
