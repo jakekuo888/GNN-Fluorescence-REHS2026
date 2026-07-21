@@ -17,6 +17,7 @@ from models.early_stop import EarlyStop
 from models.goms_sme import FragEGNN
 
 from setup.process_data import absorption_data_options, generate_graphs_labels, FragmentDataset, collate_fn
+from models.sme import sme_attribution
 
 # EASY CONTROLS vvv
 n_epochs = 100
@@ -260,6 +261,30 @@ if __name__ == "__main__":
     test_avg_mae = test(model, ext_loader, y_mean, y_std, compute_mae=True)
     print(
         f"EXTERNAL AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n-------------------------------")
+
+    print("COMPUTING SME ATTR. ON TEST SET")
+    model.eval()
+    all_attr = []
+    with torch.no_grad():
+        for data, frags_per_mol, mol_dicts in test_loader:
+            #===UNDER CONSTRUCTION===
+            data.to(device)
+            mol_dicts = [
+                {
+                    **d,
+                    "edge_index": d["edge_index"].to(device),
+                    "edge_attr": d["edge_attr"].to(device),
+                }
+                for d in mol_dicts
+            ]
+
+            sol_fps = np.array([d['sol_fp'] for d in mol_dicts])
+            sol_fp = torch.tensor(sol_fps, dtype=torch.float, device=device)
+            batch_attrs = sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, combo_search=True)
+            all_attr.extend(batch_attrs)
+
+    with open("./data/plot-data/sme.txt", "w") as f:
+        print(all_attr, file = f)
 
     # visuals
     if (collect_data):
