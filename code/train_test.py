@@ -22,6 +22,7 @@ from setup.process_data import absorption_data_options, generate_graphs_labels, 
 n_epochs = 100
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
+re_generate_data = False
 # EASY CONTROLS ^^^
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -29,7 +30,6 @@ sys.path.append(os.path.join(root_dir, 'data-wrangling'))
 sys.path.append(os.path.join(root_dir, 'plots-visuals'))
 
 if __name__ == "__main__":
-    re_generate_data = True
 
     # D4C
     molecules_dicts, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(
@@ -38,6 +38,27 @@ if __name__ == "__main__":
     # External Set
     ext_dataset, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(
         absorption_data_options[1], generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
+
+    def has_reasonable_geometry(mol_dict, max_coord=200.0):
+        for frag in mol_dict["frag_graphs"]:
+            if frag.pos.abs().max().item() > max_coord:
+                return False
+        return True
+
+    before = len(molecules_dicts)
+    molecules_dicts = [
+        d for d in molecules_dicts if has_reasonable_geometry(d)]
+    print(
+        f"Filtered {before - len(molecules_dicts)} molecules with corrupted geometry")
+
+    y_vals = torch.tensor([d["y_normalized"].item() for d in molecules_dicts])
+    baseline_mae_normalized = y_vals.abs().mean()
+    print(
+        f"Baseline (predict mean) normalized MAE: {baseline_mae_normalized:.4f}")
+
+    y_real_vals = torch.tensor([d["y_real"].item() for d in molecules_dicts])
+    baseline_mae_real = (y_real_vals - y_real_vals.mean()).abs().mean()
+    print(f"Baseline (predict mean) real-units MAE: {baseline_mae_real:.4f}")
 
     # Splitting Datasets Randomly (still a list of dictionaries)
     train_dataset, split_dataset = train_test_split(
@@ -77,6 +98,7 @@ if __name__ == "__main__":
     def train(model, opt, loader):
         model.train()
 
+        skipped, total = 0, 0
         for data, frags_per_mol, mol_dicts in loader:
             data.to(device)
 
@@ -92,37 +114,40 @@ if __name__ == "__main__":
             sol_fps = [d['sol_fp'] for d in mol_dicts]
             sol_fps = np.array(sol_fps)
             sol_fp = torch.tensor(sol_fps, dtype=torch.float, device=device)
-            # sol_fp = torch.tensor(np.array(data.sol_fp), dtype=torch.float).to(device)
             final_readout, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
                                        data.batch, frags_per_mol, mol_dicts, sol_fp)
-
-            """if torch.isnan(final_readout).any():
-                print("--- NaN Detected in Readout! ---")
-                print("Batch size:", data.num_graphs if hasattr(
-                    data, 'num_graphs') else "Unknown")
-                print("Number of edges in batch:",
-                      data.edge_index.shape[1] if data.edge_index is not None else 0)
-                # Check if a specific graph in the batch has 0 nodes or edges
-                if hasattr(data, 'batch'):
-                    for i in range(data.num_graphs):
-                        num_nodes = (data.batch == i).sum().item()
-                        print(f"Graph {i} has {num_nodes} nodes.")"""
 
             y = torch.tensor([d["y_normalized"] for d in mol_dicts],
                              dtype=torch.float).to(device).unsqueeze(-1)
 
             loss = criterion(out, y)
+            total += 1
 
-            if not torch.isfinite(loss) or loss.item() > 1000.0:
+            if not torch.isfinite(loss) or loss.item() > 1e6:
                 offending_smiles = [d["smiles"] for d in mol_dicts]
                 print(
                     f"!!! Skipping batch, loss={loss.item()}. Molecules in batch: {offending_smiles}")
                 opt.zero_grad()
+                skipped += 1
                 continue  # skip this batch entirely -- don't let it corrupt the weights
 
             opt.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            grads_ok = all(
+                torch.isfinite(p.grad).all()
+                for p in model.parameters() if p.grad is not None
+            )
+
+            if not grads_ok:
+                skipped += 1
+                print(
+                    f"!!! Skipping step, NaN/Inf gradient detected. Molecules: {[d['smiles'] for d in mol_dicts]}")
+                opt.zero_grad()
+                continue
+
             opt.step()
+        # print(f"  [train] skipped {skipped}/{total} batches")
 
     train_vectors_for_similarity = []
     test_vectors_for_similarity = []
@@ -136,9 +161,12 @@ if __name__ == "__main__":
         total_mae = 0.0
         total_graphs = 0
 
+        skipped, total = 0, 0
+
         with torch.no_grad():
 
             for data, frags_per_mol, mol_dicts in loader:
+                total += 1
                 data.to(device)
 
                 mol_dicts = [
@@ -162,7 +190,8 @@ if __name__ == "__main__":
                 loss = criterion(out, y)
 
                 # Reverse normalization for prediction
-                pred_log = out.squeeze() * std + mean
+                pred_log = out.squeeze(-1) * std + mean
+                pred_log = torch.clamp(pred_log, max=12)
                 pred_actual = torch.exp(pred_log)
                 pred_actual = pred_actual.flatten()
 
@@ -171,6 +200,13 @@ if __name__ == "__main__":
                                              dtype=torch.float).to(device).unsqueeze(-1)
 
                 loss = torch.mean(torch.abs(pred_actual - target_actual))
+
+                if not torch.isfinite(loss) or loss.item() > 1e6:
+                    skipped += 1
+                    offending_smiles = [d["smiles"] for d in mol_dicts]
+                    print(
+                        f"!!! Skipping eval batch, loss={loss.item()}. Molecules: {offending_smiles}")
+                    continue  # don't let this batch's inf poison the epoch average
 
                 if collect_plot_data and not is_test_set:
                     train_vectors_for_similarity.extend(vector_out.unbind(0))
@@ -183,7 +219,7 @@ if __name__ == "__main__":
                     num_graphs = data.num_graphs
                     total_mae += loss * num_graphs
                     total_graphs += num_graphs
-
+            # print(f"  [test] skipped {skipped}/{total} batches")
         if compute_mae:
             avg_mae = total_mae / total_graphs
 

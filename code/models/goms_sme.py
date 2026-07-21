@@ -111,8 +111,8 @@ class Model(nn.Module):
         self.gat = GAT(node_features, gs_edge_features,
                        hidden_channels, num_layers)
         self.sol_ffnn = FFNN(solv_features, hidden_channels,
-                             hidden_sizes=[128, 128, 128])
-        self.ffnn = FFNN(2*hidden_channels, 1, [128, 128, 128])
+                             hidden_sizes=[32, 32])
+        self.ffnn = FFNN(2*hidden_channels, 1, [64, 64])
 
     def forward(self, x, pos, edge_index, edge_attr, batch, frags_per_mol, mol_dicts, solv_morgan):
         frag_vecs = self.egnn(x, pos, edge_index, edge_attr, batch)
