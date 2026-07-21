@@ -19,8 +19,10 @@ from models.goms_sme import FragEGNN
 from setup.process_data import absorption_data_options, generate_graphs_labels, FragmentDataset, collate_fn
 from models.sme import sme_attribution
 
+import json
+
 # EASY CONTROLS vvv
-n_epochs = 2
+n_epochs = 4
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 re_generate_data = False
@@ -276,11 +278,11 @@ if __name__ == "__main__":
         f"EXTERNAL AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n-------------------------------")
 
     print("\n \n COMPUTING SME ATTR. ON TEST SET")
+    
     model.eval()
     all_attr = []
     with torch.no_grad():
         for data, frags_per_mol, mol_dicts in test_loader:
-            #===UNDER CONSTRUCTION===
             data.to(device)
             mol_dicts = [
                 {
@@ -294,13 +296,23 @@ if __name__ == "__main__":
             sol_fps = np.array([d['sol_fp'] for d in mol_dicts])
             sol_fp = torch.tensor(sol_fps, dtype=torch.float, device=device)
             batch_attrs = sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, combo_search=True)
-            all_attr.extend(batch_attrs)
+
+            # attach molecule identity + fragment->atom mapping to each result
+            for mol_dict, attrs in zip(mol_dicts, batch_attrs):
+                record = {
+                    "smiles": mol_dict["smiles"],
+                    "atom_groups": [list(g) for g in mol_dict["atom_groups"]],  # fragment_idx -> atom indices
+                    "attributions": {str(k): v for k, v in attrs.items() if k != "combinations"},
+                }
+                if "combinations" in attrs:
+                    # combo keys are tuples, e.g. (0,2) -> json needs string keys
+                    record["combinations"] = {str(k): v for k, v in attrs["combinations"].items()}
+                all_attr.append(record)
+
+    with open("./data/plot-data/sme.json", "w") as f:
+        json.dump(all_attr, f, indent=2)
 
     print("COMPUTING SME DONE; CONTINUING.")
-
-
-    with open("./data/plot-data/sme.txt", "w") as f:
-        print(all_attr, file = f)
 
     # visuals
     if (collect_data):
@@ -317,8 +329,12 @@ if __name__ == "__main__":
                 train_vectors_for_similarity, test_vectors_for_similarity, test_losses_for_similarity)
             print("Scatterplot successfully created! \n Check plots-visuals/new-plots")
 
+
             print("Creating scatterplot of the error vs similarity (smiles) \n ...")
             plot_smiles_similarity_loss_graph(
                 train_smiles_collected, test_smiles_collected, test_losses_for_similarity)
+
+            print("Creating SME masking graphs \n ...")
+            subprocess.run([sys.executable, "./code/plotting/plot_sme_graph.py"])
 
     print("PROCESS DONE. \n EXITING.")
