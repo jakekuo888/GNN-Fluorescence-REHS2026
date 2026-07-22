@@ -42,6 +42,9 @@ if __name__ == "__main__":
     ext_dataset, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(
         absorption_data_options[1], generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
 
+    if re_generate_data:
+        print("DATA FINISHED GENERATING")
+    
     def has_reasonable_geometry(mol_dict, max_coord=200.0):
         for frag in mol_dict["frag_graphs"]:
             if frag.pos.abs().max().item() > max_coord:
