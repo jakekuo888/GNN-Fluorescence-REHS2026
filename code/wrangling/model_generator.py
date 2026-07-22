@@ -21,7 +21,6 @@ fp_gen = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
 def get_atom_features(atom):
     permitted_atoms = ['C', 'N', 'O', 'S', 'F', 'Cl',
                        'Br', 'I', 'Se', 'Te', 'Si', 'P', 'B', 'Sn', 'Ge']
-    # one-hot everything
     atom_type = [int(atom.GetSymbol() == x) for x in permitted_atoms]
 
     atomH = atom.GetHybridization()
@@ -31,8 +30,12 @@ def get_atom_features(atom):
         int(atomH == Chem.rdchem.HybridizationType.SP3)
     ]
 
-    charge = float(atom.GetDoubleProp('_GasteigerCharge'))
-    if not np.isfinite(charge):
+    # Fix: Safely handle missing Gasteiger charge properties
+    try:
+        charge = float(atom.GetDoubleProp('_GasteigerCharge'))
+        if not np.isfinite(charge):
+            charge = 0.0
+    except (KeyError, RuntimeError):
         charge = 0.0
 
     chirality_options = [
@@ -76,29 +79,19 @@ def resolve_smiles(name, dictionary, file):
     blocker = rdBase.BlockLogs()
 
     SOLVENT_MANUAL_MAP = {
-        # spacing variants of DCM
         'CH2Cl2': 'ClCCl',
         'CH 2 Cl 2': 'ClCCl',
         'CH 2 Cl': 'ClCCl',
-        # acetonitrile
         'CH3CN': 'CC#N',
         'CH 3 CN': 'CC#N',
-        # methanol
         'CH3OH': 'CO',
         'CH 3 OH': 'CO',
-        # benzene
         'C6H6': 'c1ccccc1',
-        # cyclohexane
         'C6H12': 'C1CCCCC1',
-        # ethyl acetate
         'EtOAc': 'CCOC(C)=O',
-        # MTHF (2-methyltetrahydrofuran)
         'MTHF': 'C1CCC(C)O1',
-        # benzonitrile
         'PhCN': 'N#Cc1ccccc1',
-        # DMSO typo
         'dimethylsufoxide': 'CS(C)=O',
-        # water
         'H 2 O': 'O',
         'H2O': 'O'
     }
@@ -112,45 +105,14 @@ def resolve_smiles(name, dictionary, file):
         else:
             print(f"Fetching SMILES for: {name}")
             result = cirpy.resolve(name, 'smiles')
-            dictionary[name] = result  # cache even if None
+            dictionary[name] = result
 
-            # save updated cache to disk
             with open(file, 'w') as f:
                 json.dump(dictionary, f)
 
             return result
     else:
         return name
-
-
-def get_fallback_bond_indices(mol: Chem.Mol):
-    bonds_to_break = [b[0] for b in BRICS.FindBRICSBonds(mol)]
-
-    if bonds_to_break:
-        # Extract the bond IDs for BRICS
-        bond_indices = [mol.GetBondBetweenAtoms(
-            i, j).GetIdx() for i, j in bonds_to_break]
-        return bonds_to_break, bond_indices, "brics"
-
-    # 2. Fallback to Fraggle style if BRICS found 0 bonds
-    fraggle_bond_indices = []
-    fraggle_bonds_to_break = []
-
-    # FraggleSim relies primarily on breaking non-ring (acyclic) bonds
-    for bond in mol.GetBonds():
-        # Fraggle looks for single acyclic cuts that don't isolate single atoms
-        # (like cutting a terminal methyl off). We mimic that logic here:
-        if not bond.IsInRing():
-            begin_atom = bond.GetBeginAtom()
-            end_atom = bond.GetEndAtom()
-
-            # Ensure we aren't just chopping off a terminal heavy atom (e.g., -CH3, -F, -OH)
-            if begin_atom.GetDegree() > 1 and end_atom.GetDegree() > 1:
-                atom_pair = (begin_atom.GetIdx(), end_atom.GetIdx())
-                fraggle_bonds_to_break.append(atom_pair)
-                fraggle_bond_indices.append(bond.GetIdx())
-
-    return fraggle_bonds_to_break, fraggle_bond_indices, "fraggle"
 
 
 def return_frags(mol, graph):
@@ -176,7 +138,6 @@ def return_frags(mol, graph):
             )
             frag_data = Data(
                 x=graph.x[subset],
-                # original global coords, untouched
                 pos=graph.pos[subset],
                 edge_index=sub_edge_index,
                 edge_attr=sub_edge_attr,
@@ -210,7 +171,6 @@ def return_frags(mol, graph):
         frag_brics_types[frag_a].add(label_i)
         frag_brics_types[frag_b].add(label_j)
 
-
     frag_fps = [
         fp_gen.GetFingerprint(mol=mol, fromAtoms=list(g)) for g in atom_groups
     ]
@@ -232,7 +192,6 @@ def return_frags(mol, graph):
 
 
 def gen_data(dict_):
-    # objective: return a bigger dict to be make one-liner GNN
     n_frags = len(dict_["frag_graphs"])
     frag_graphs = dict_["frag_graphs"]
 
@@ -243,13 +202,16 @@ def gen_data(dict_):
     smiles = dict_['smiles']
 
     pair_to_attr = {}
-    try:
-        src_all, dst_all = entire_graph.edge_index
-    except Exception as e:
-        print(f"CRITICAL ERROR IN SRC, DST: {smiles}")
-        return None
+    # Fix: Verify graph has edges before trying to unpack edge_index
+    if entire_graph.edge_index.numel() == 0 or entire_graph.edge_index.dim() < 2:
+        src_all, dst_all = torch.tensor([], dtype=torch.long), torch.tensor([], dtype=torch.long)
+    else:
+        try:
+            src_all, dst_all = entire_graph.edge_index
+        except Exception as e:
+            return None
 
-    for k in range(entire_graph.edge_index.size(1)):
+    for k in range(entire_graph.edge_index.size(1) if entire_graph.edge_index.dim() == 2 else 0):
         a1, a2 = src_all[k].item(), dst_all[k].item()
         f1, f2 = atom_to_frag[a1], atom_to_frag[a2]
         if f1 != f2:
@@ -262,7 +224,6 @@ def gen_data(dict_):
         try:
             attr = pair_to_attr[(min(f1, f2), max(f1, f2))]
         except Exception as e:
-            print(f"CRITICAL ERROR: MAX(f1, f2) FAILED-- " + dict_["smiles"])
             return None
         src += [f1, f2]
         dst += [f2, f1]
@@ -302,10 +263,8 @@ def optimize_conformer(mol, max_iters=2000):
         if result == 0:
             return mol, "MMFF"
         elif result == 1:
-            # ran out of iterations, not a real failure -- geometry is still meaningfully relaxed
             return mol, "MMFF_partial"
 
-    # only reach here on a genuine parameter failure (-1), not a slow-converging molecule
     result = rdForceFieldHelpers.UFFOptimizeMolecule(mol, maxIters=max_iters)
     if result == 0:
         return mol, "UFF"
@@ -323,11 +282,10 @@ def embed_conformer(mol):
 
     conf_id = rdDistGeom.EmbedMolecule(mol, params)
     if conf_id == -1:
-        # last resort -- pure random-distance-geometry, no torsion knowledge
         conf_id = rdDistGeom.EmbedMolecule(
             mol, useRandomCoords=True, maxAttempts=2000)
 
-    return conf_id  # still -1 if truly unembeddable -- caller must check
+    return conf_id
 
 
 CACHE_FILE = './data/solvent_cache.json'
@@ -354,30 +312,33 @@ def smiles_to_graph(smiles):
         if mol is None:
             return None
 
+    # Fix: Reject single atoms or bare ions that cannot form valid molecular graphs
+    if mol.GetNumAtoms() < 2:
+        return None
+
     mol = Chem.AddHs(mol)
 
     conf_id = embed_conformer(mol)
     if conf_id == -1:
-        print(f"\n Error: Conformer failed - {smiles}")
         return None
 
     try:
         mol, method = optimize_conformer(mol)
-        if method == "unoptimized":
-            print(f"\n Warning: Unoptimized molecule, can proceed safely - {smiles}")
     except Exception as e:
-        print(f"\n Error: MMFF failed - {smiles}")
         return None
 
     try:
         conf = mol.GetConformer()
     except Exception as e:
-        print(f"n Error: Conformer failed - {smiles}")
         return None
+
     positions = conf.GetPositions()
     positions = torch.tensor(positions, dtype=torch.float)
 
-    rdPartialCharges.ComputeGasteigerCharges(mol)
+    try:
+        rdPartialCharges.ComputeGasteigerCharges(mol)
+    except Exception:
+        pass
 
     node_feats = [get_atom_features(atom) for atom in mol.GetAtoms()]
     x = torch.tensor(node_feats, dtype=torch.float)
@@ -391,16 +352,19 @@ def smiles_to_graph(smiles):
 
         attr = get_bond_features(bond)
 
-        # do twice so it's treated like an undirected graph
         bond_indices.append([start_idx, end_idx])
         bond_indices.append([end_idx, start_idx])
 
         bond_attrs.append(attr)
         bond_attrs.append(attr)
 
-    edge_indices = torch.tensor(
-        bond_indices, dtype=torch.long).t().contiguous()
-    edge_attrs = torch.tensor(bond_attrs, dtype=torch.float)
+    # Fix: Proper 2D tensor shape for molecules with 0 bonds
+    if len(bond_indices) == 0:
+        edge_indices = torch.empty((2, 0), dtype=torch.long)
+        edge_attrs = torch.empty((0, NUM_EDGE_FEATURES), dtype=torch.float)
+    else:
+        edge_indices = torch.tensor(bond_indices, dtype=torch.long).t().contiguous()
+        edge_attrs = torch.tensor(bond_attrs, dtype=torch.float)
 
     data = Data(x=x, pos=positions, edge_index=edge_indices,
                 edge_attr=edge_attrs)
@@ -412,8 +376,52 @@ def smiles_to_graph(smiles):
 
 def smiles_to_morgan_fp(fp_gen, smiles):
     mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return np.zeros((2048,), dtype=np.int8)
     bit_vect = fp_gen.GetFingerprint(mol)
     fp_array = np.zeros((2048,), dtype=np.int8)
     Chem.DataStructs.ConvertToNumpyArray(bit_vect, fp_array)
 
     return fp_array
+
+
+def save_sample_pdbs(smiles_list, out_dir="./data/pdb-molecules", n=10):
+    os.makedirs(out_dir, exist_ok=True)
+
+    saved = 0
+    for smiles in smiles_list:
+        if saved >= n:
+            break
+
+        blocker = rdBase.BlockLogs()
+
+        mol = Chem.MolFromSmiles(str(smiles))
+        if mol is None:
+            resolved = resolve_smiles(str(smiles), SOLVENT_SMILES, CACHE_FILE)
+            if resolved is None:
+                continue
+            mol = Chem.MolFromSmiles(resolved)
+            if mol is None:
+                continue
+
+        mol = Chem.AddHs(mol)
+
+        conf_id = embed_conformer(mol)
+        if conf_id == -1:
+            continue
+
+        try:
+            mol, method = optimize_conformer(mol)
+        except Exception as e:
+            continue
+
+        pdb_path = os.path.join(out_dir, f"mol_{saved}.pdb")
+        try:
+            Chem.MolToPDBFile(mol, pdb_path)
+        except Exception as e:
+            continue
+
+        print(f"Saved PDB: {pdb_path}  <-  {smiles}")
+        saved += 1
+
+    print(f"\nSaved {saved}/{n} requested molecules as PDB files to {out_dir}")

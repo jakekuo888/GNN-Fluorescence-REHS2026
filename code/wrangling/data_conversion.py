@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import torch
-from wrangling.model_generator import smiles_to_graph, smiles_to_morgan_fp, resolve_smiles
+from wrangling.model_generator import smiles_to_graph, smiles_to_morgan_fp, resolve_smiles, save_sample_pdbs
 from rdkit.Chem import rdFingerprintGenerator
 import os
 import json
@@ -9,7 +9,9 @@ import pickle
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
+import torch.multiprocessing as torch_mp
 
+torch_mp.set_sharing_strategy('file_system')
 
 def is_null_graph(graph):
     return graph.x.shape[0] == 1 and graph.x.sum() == 0
@@ -56,13 +58,13 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
 
     unique_mol_smiles = list({row[mol_label] for row in valid_rows})
 
-    SHARD_SIZE = 500
+    save_sample_pdbs(unique_mol_smiles, out_dir="./data/pdb-molecules", n=10)
+
+    SHARD_SIZE = 10000
     shard_files = []
     output_dir = "temp_shards"
     os.makedirs(output_dir, exist_ok=True)
 
-    #Process molecules in shards of SHARD_SIZE
-    
     print("QUICK INFO:")
     print(f"\n Est. total number of shards: {len(unique_mol_smiles)//SHARD_SIZE + 1}")
     print(f" There are {len(unique_mol_smiles)} to process in total.")
@@ -75,37 +77,51 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
         shard_path = os.path.join(output_dir, f"shard_{shard_index}.pickle")
 
         shard_dict = {}
+        target_count = int(len(shard_smiles) * 0.99)
 
         print(
             f"\nProcessing shard {shard_index + 1} (molecules {i} to {i + len(shard_smiles)})...")
+        print(f"Stopping early once {target_count} / {len(shard_smiles)} total tasks complete.")
 
-        with ProcessPoolExecutor() as executor:
+        executor = ProcessPoolExecutor()
+        processed_count = 0
+        try:
             futures = {executor.submit(smiles_to_graph, s): s for s in shard_smiles}
 
-            for fut in tqdm(as_completed(futures), total=len(futures), desc=f"Shard {shard_index + 1}"):
-                s = futures[fut]
-                shard_dict[s] = fut.result()
+            with tqdm(total=target_count, desc=f"Shard {shard_index + 1}") as pbar:
+                for fut in as_completed(futures):
+                    s = futures[fut]
+                    processed_count += 1
+                    pbar.update(1)
 
-        # Save the current shard to disk immediately
-        # Note: If your graph objects aren't JSON-serializable, use `pickle.dump` instead.
-        with open(shard_path, 'bw') as f:
+                    try:
+                        graph = fut.result()
+                        if graph is not None:
+                            shard_dict[s] = graph
+                    except Exception as e:
+                        print(f"\nError processing SMILES {s}: {e}")
+
+                    # Fix: track completed tasks (processed_count) instead of valid graphs (len(shard_dict))
+                    if processed_count >= target_count:
+                        print(f"\nReached 99% completion threshold. Skipping remaining stragglers in shard {shard_index + 1}.")
+                        break
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
+        with open(shard_path, 'wb') as f:
             pickle.dump(shard_dict, f)
 
         shard_files.append(shard_path)
 
-    # 2. Combine all shards at the end
     print("\nCombining all shards into final dictionary...")
     smiles_to_dict = {}
 
     for shard_path in shard_files:
-        with open(shard_path, 'br') as f:
+        with open(shard_path, 'rb') as f:
             shard_data = pickle.load(f)
             smiles_to_dict.update(shard_data)
+        os.remove(shard_path)
 
-    # Optional: Clean up the shard file after merging to save disk space
-    os.remove(shard_path)
-
-    # Optional: Clean up the empty temp directory
     if os.path.exists(output_dir) and not os.listdir(output_dir):
         os.rmdir(output_dir)
 
@@ -121,9 +137,12 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
         final_m_dicts.append(mol_dict)
         s_prints.append(smiles_to_morgan_fp(fp_gen, sol_smiles))
         y_values.append(row[predicted_name])
-    # export
 
+    # Export
     print("Uploading data")
+
+    # Fix: Ensure destination folder exists
+    os.makedirs(f"./data/{folder}", exist_ok=True)
 
     with open(f"./data/{folder}/{out_file}", "w") as f:
         for d in y_values:
@@ -132,7 +151,6 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
     fp_matrix = np.vstack(s_prints)
 
     torch.save(final_m_dicts, f"./data/{folder}/molecularGraphs-{dataset}.pt")
-    # torch.save(s_graphs, f"./data/{folder}/solventGraphs-{dataset}.pt")
     np.savez_compressed(
         f"./data/{folder}/solventFingerprints-{dataset}.npz", fps=fp_matrix)
 

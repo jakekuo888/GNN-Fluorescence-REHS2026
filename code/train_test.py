@@ -20,12 +20,13 @@ from setup.process_data import absorption_data_options, generate_graphs_labels, 
 from models.sme import sme_attribution
 
 import json
+from rdkit import Chem
 
 # EASY CONTROLS vvv
 n_epochs = 4
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
-re_generate_data = True
+re_generate_data = False
 # EASY CONTROLS ^^^
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -44,7 +45,7 @@ if __name__ == "__main__":
 
     if re_generate_data:
         print("DATA FINISHED GENERATING")
-    
+
     def has_reasonable_geometry(mol_dict, max_coord=200.0):
         for frag in mol_dict["frag_graphs"]:
             if frag.pos.abs().max().item() > max_coord:
@@ -281,7 +282,6 @@ if __name__ == "__main__":
         f"EXTERNAL AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n-------------------------------")
 
     print("\n \n COMPUTING SME ATTR. ON TEST SET")
-
     model.eval()
     all_attr = []
     with torch.no_grad():
@@ -298,23 +298,52 @@ if __name__ == "__main__":
 
             sol_fps = np.array([d['sol_fp'] for d in mol_dicts])
             sol_fp = torch.tensor(sol_fps, dtype=torch.float, device=device)
-            batch_attrs = sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, combo_search=True)
+            batch_attrs = sme_attribution(
+                model, data, frags_per_mol, mol_dicts, sol_fp, device, combo_search=True)
 
             for mol_dict, attrs in zip(mol_dicts, batch_attrs):
-                fragment_attrs = {str(k): v for k, v in attrs.items() if k != "combinations"}
+                smiles = mol_dict["smiles"]
+
+                # atom_groups was computed on the AddHs'd molecule upstream
+                # (in smiles_to_graph). RDKit's AddHs appends Hs after all
+                # existing heavy atoms without reordering them, so heavy-atom
+                # indices are unaffected -- we can just filter out any index
+                # that belongs to an H atom rather than reconstructing the
+                # AddHs'd molecule here.
+                heavy_mol = Chem.MolFromSmiles(smiles)
+                n_heavy = heavy_mol.GetNumAtoms()
+
+                filtered_atom_groups = [
+                    [a for a in group if a < n_heavy]
+                    for group in mol_dict["atom_groups"]
+                ]
+
+                fragment_removal = {
+                    str(k): v for k, v in attrs.items() if k != "combinations"}
+
+                # BRICS bond-type label(s) bordering each fragment, same
+                # indexing as atom_groups -- lets the plotting script color
+                # fragments by chemical BRICS category.
+                brics_types = {
+                    str(frag_id): sorted(labels)
+                    for frag_id, labels in mol_dict["frag_brics_types"].items()
+                }
 
                 record = {
-                    "smiles": mol_dict["smiles"],
-                    "atom_groups": [list(g) for g in mol_dict["atom_groups"]],
-                    "fragment_removal": fragment_attrs,
+                    "smiles": smiles,
+                    "atom_groups": filtered_atom_groups,
+                    "fragment_removal": fragment_removal,
+                    "frag_brics_types": brics_types,
                 }
 
                 if "combinations" in attrs:
-                    record["combinations"] = {str(k): v for k, v in attrs["combinations"].items()}
+                    record["combinations"] = {
+                        str(k): v for k, v in attrs["combinations"].items()}
 
                 all_attr.append(record)
 
     print("COMPUTING SME DONE; CONTINUING.")
+
 
     with open("./data/plot-data/sme.json", "w") as f:
         json.dump(all_attr, f, indent=2)
