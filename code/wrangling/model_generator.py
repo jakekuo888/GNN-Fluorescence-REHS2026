@@ -154,7 +154,10 @@ def get_fallback_bond_indices(mol: Chem.Mol):
 
 
 def return_frags(mol, graph):
-    bonds_to_break = [b[0] for b in BRICS.FindBRICSBonds(mol)]
+    bric_bonds = list(BRICS.FindBRICSBonds(mol))
+    bonds_to_break = [b[0] for b in bric_bonds]
+    bonds_name = [b[1] for b in bric_bonds]
+
     bond_indices = [mol.GetBondBetweenAtoms(
         i, j).GetIdx() for i, j in bonds_to_break]
 
@@ -200,6 +203,14 @@ def return_frags(mol, graph):
         if frag_a != frag_b:
             gs_edges.add((min(frag_a, frag_b), max(frag_a, frag_b)))
 
+    frag_brics_types = {frag_id: set() for frag_id in range(len(atom_groups))}
+    for (atom_i, atom_j), (label_i, label_j) in zip(bonds_to_break, bonds_name):
+        frag_a = atom_to_frag[atom_i]
+        frag_b = atom_to_frag[atom_j]
+        frag_brics_types[frag_a].add(label_i)
+        frag_brics_types[frag_b].add(label_j)
+
+
     frag_fps = [
         fp_gen.GetFingerprint(mol=mol, fromAtoms=list(g)) for g in atom_groups
     ]
@@ -211,7 +222,8 @@ def return_frags(mol, graph):
         "gs_edges": gs_edges,
         "frag_fps": frag_fps,
         "entire_graph": graph,
-        "smiles": graph.smiles
+        "smiles": graph.smiles,
+        "frag_brics_types": frag_brics_types,
     }
 
     final_output = gen_data(fragmentation_output)

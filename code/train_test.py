@@ -20,13 +20,12 @@ from setup.process_data import absorption_data_options, generate_graphs_labels, 
 from models.sme import sme_attribution
 
 import json
-from rdkit import Chem
 
 # EASY CONTROLS vvv
 n_epochs = 4
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
-re_generate_data = False
+re_generate_data = True
 # EASY CONTROLS ^^^
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -279,6 +278,7 @@ if __name__ == "__main__":
         f"EXTERNAL AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n-------------------------------")
 
     print("\n \n COMPUTING SME ATTR. ON TEST SET")
+
     model.eval()
     all_attr = []
     with torch.no_grad():
@@ -298,27 +298,12 @@ if __name__ == "__main__":
             batch_attrs = sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, combo_search=True)
 
             for mol_dict, attrs in zip(mol_dicts, batch_attrs):
-                smiles = mol_dict["smiles"]
-
-                # Heavy-atom-only molecule -- H indices in atom_groups (computed
-                # on the AddHs'd molecule upstream) are all >= this count, since
-                # RDKit's AddHs appends Hs after existing heavy atoms without
-                # reordering them. So we can filter by index alone, no need to
-                # reconstruct the H-added molecule here.
-                heavy_mol = Chem.MolFromSmiles(smiles)
-                n_heavy = heavy_mol.GetNumAtoms()
-
-                filtered_atom_groups = [
-                    [a for a in group if a < n_heavy]
-                    for group in mol_dict["atom_groups"]
-                ]
-
-                fragment_removal = {str(k): v for k, v in attrs.items() if k != "combinations"}
+                fragment_attrs = {str(k): v for k, v in attrs.items() if k != "combinations"}
 
                 record = {
-                    "smiles": smiles,
-                    "atom_groups": filtered_atom_groups,  # heavy atoms only now
-                    "fragment_removal": fragment_removal,
+                    "smiles": mol_dict["smiles"],
+                    "atom_groups": [list(g) for g in mol_dict["atom_groups"]],
+                    "fragment_removal": fragment_attrs,
                 }
 
                 if "combinations" in attrs:
