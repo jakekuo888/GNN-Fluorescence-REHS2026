@@ -20,6 +20,7 @@ from setup.process_data import absorption_data_options, generate_graphs_labels, 
 from models.sme import sme_attribution
 
 import json
+from rdkit import Chem
 
 # EASY CONTROLS vvv
 n_epochs = 4
@@ -278,7 +279,6 @@ if __name__ == "__main__":
         f"EXTERNAL AVERAGE MAE (FINAL RESULTS): {test_avg_mae}\n-------------------------------")
 
     print("\n \n COMPUTING SME ATTR. ON TEST SET")
-    
     model.eval()
     all_attr = []
     with torch.no_grad():
@@ -297,22 +297,39 @@ if __name__ == "__main__":
             sol_fp = torch.tensor(sol_fps, dtype=torch.float, device=device)
             batch_attrs = sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, combo_search=True)
 
-            # attach molecule identity + fragment->atom mapping to each result
             for mol_dict, attrs in zip(mol_dicts, batch_attrs):
+                smiles = mol_dict["smiles"]
+
+                # Heavy-atom-only molecule -- H indices in atom_groups (computed
+                # on the AddHs'd molecule upstream) are all >= this count, since
+                # RDKit's AddHs appends Hs after existing heavy atoms without
+                # reordering them. So we can filter by index alone, no need to
+                # reconstruct the H-added molecule here.
+                heavy_mol = Chem.MolFromSmiles(smiles)
+                n_heavy = heavy_mol.GetNumAtoms()
+
+                filtered_atom_groups = [
+                    [a for a in group if a < n_heavy]
+                    for group in mol_dict["atom_groups"]
+                ]
+
+                fragment_removal = {str(k): v for k, v in attrs.items() if k != "combinations"}
+
                 record = {
-                    "smiles": mol_dict["smiles"],
-                    "atom_groups": [list(g) for g in mol_dict["atom_groups"]],  # fragment_idx -> atom indices
-                    "attributions": {str(k): v for k, v in attrs.items() if k != "combinations"},
+                    "smiles": smiles,
+                    "atom_groups": filtered_atom_groups,  # heavy atoms only now
+                    "fragment_removal": fragment_removal,
                 }
+
                 if "combinations" in attrs:
-                    # combo keys are tuples, e.g. (0,2) -> json needs string keys
                     record["combinations"] = {str(k): v for k, v in attrs["combinations"].items()}
+
                 all_attr.append(record)
+
+    print("COMPUTING SME DONE; CONTINUING.")
 
     with open("./data/plot-data/sme.json", "w") as f:
         json.dump(all_attr, f, indent=2)
-
-    print("COMPUTING SME DONE; CONTINUING.")
 
     # visuals
     if (collect_data):
