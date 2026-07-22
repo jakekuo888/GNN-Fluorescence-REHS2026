@@ -28,7 +28,7 @@ except Exception as e:
 
 fpath = "./plots-visuals/SME-Graphs/"
 
-#reset folder
+# reset folder
 if os.path.exists(fpath):
     shutil.rmtree(fpath)
 
@@ -88,6 +88,32 @@ FragColors = [
     (0.2, 1.0, 0.5)
 ]
 
+# BRICS families are numbered 1-16, we index FamColor[0] = "no family"
+# (fallback gray) and FamColor[1..16] = actual BRICS types, so the same
+# family number always maps to the same color across every molecule/image.
+FamColor = {0: (0.6, 0.6, 0.6)}  # fallback: fragment with no BRICS boundary
+for i in range(1, 17):
+    FamColor[i] = FragColors[i - 1]
+
+print(FamColor)
+
+
+def brics_label_to_family(label):
+    # strip trailing letters, e.g. '3a' -> 3, '4b' -> 4
+    digits = ''.join(ch for ch in label if ch.isdigit())
+    if not digits:
+        return 0
+    fam = int(digits)
+    return fam if fam in FamColor else 0
+
+
+def fragment_family(labels):
+    # a fragment can border multiple BRICS types if it's bonded to more
+    # than one neighbor fragment -- use the smallest label as representative
+    if not labels:
+        return 0
+    return brics_label_to_family(sorted(labels)[0])
+
 
 mol_num = 0
 
@@ -100,21 +126,24 @@ for mol in data[:n_img_gen]:
 
     opts.useBWAtomPalette()
 
-    #generate group colors
-    fragN = 0
+    # generate colors by BRICS family instead of by fragment index
     HAC = {}
-    for fragment in mol['atom_groups']:
+    for frag_id_str, fragment in enumerate(mol['atom_groups']):
+        labels = mol['frag_brics_types'].get(str(frag_id_str), [])
+        fam = fragment_family(labels)
+        color = FamColor[fam]
         for atom in fragment:
-            HAC[atom] = FragColors[fragN]
-        fragN += 1
+            HAC[atom] = color
 
-    z_nums = [n for n in mol['fragment_removal'].values()]
-    m_val = np.mean(z_nums)
-    std_val = np.std(z_nums)
+    abs_vals = [abs(n) for n in mol['fragment_removal'].values()]
+    max_val = max(abs_vals) if abs_vals and max(abs_vals) != 0 else 1.0
+
     radii = {}
     for key, rm_frag in mol['fragment_removal'].items():
+        # Scale between 0.2 (minimum radius) and 0.8 (maximum radius)
+        scaled_radius = 0.2 + 0.6 * (abs(rm_frag) / max_val)
         for atom in mol['atom_groups'][int(key)]:
-            radii[atom] = (rm_frag - m_val) / (2 * std_val)
+            radii[atom] = scaled_radius
 
     drawer.DrawMolecule(
         struct,
