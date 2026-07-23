@@ -23,7 +23,7 @@ import json
 from rdkit import Chem
 
 # EASY CONTROLS vvv
-n_epochs = 1
+n_epochs = 10
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 re_generate_data = False
