@@ -23,7 +23,7 @@ import json
 from rdkit import Chem
 
 # EASY CONTROLS vvv
-n_epochs = 4
+n_epochs = 1
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
 re_generate_data = False
@@ -304,12 +304,6 @@ if __name__ == "__main__":
             for mol_dict, attrs in zip(mol_dicts, batch_attrs):
                 smiles = mol_dict["smiles"]
 
-                # atom_groups was computed on the AddHs'd molecule upstream
-                # (in smiles_to_graph). RDKit's AddHs appends Hs after all
-                # existing heavy atoms without reordering them, so heavy-atom
-                # indices are unaffected -- we can just filter out any index
-                # that belongs to an H atom rather than reconstructing the
-                # AddHs'd molecule here.
                 heavy_mol = Chem.MolFromSmiles(smiles)
                 n_heavy = heavy_mol.GetNumAtoms()
 
@@ -321,9 +315,6 @@ if __name__ == "__main__":
                 fragment_removal = {
                     str(k): v for k, v in attrs.items() if k != "combinations"}
 
-                # BRICS bond-type label(s) bordering each fragment, same
-                # indexing as atom_groups -- lets the plotting script color
-                # fragments by chemical BRICS category.
                 brics_types = {
                     str(frag_id): sorted(labels)
                     for frag_id, labels in mol_dict["frag_brics_types"].items()
