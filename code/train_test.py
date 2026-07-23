@@ -71,23 +71,14 @@ if __name__ == "__main__":
         nabla_train, generate_data=re_generate_data)
 
     molecules_dicts_val, val_y_mean, val_y_std, val_smiles_for_similarity, val_solv_features = generate_graphs_labels(
-        nabla_train, generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
+        nabla_val, generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
 
     molecules_dicts_test, ts_y_mean, ts_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(
-        nabla_train, generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
+        nabla_test, generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
 
     # External Set
     ext_dataset, ext_y_mean, ext_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(
         qmwf_absorption, generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
-
-    if re_generate_data:
-        print("DATA FINISHED GENERATING")
-
-    def has_reasonable_geometry(mol_dict, max_coord=200.0):
-        for frag in mol_dict["frag_graphs"]:
-            if frag.pos.abs().max().item() > max_coord:
-                return False
-        return True
 
     ALLOWED_ATOMIC_NUMS = {1, 5, 6, 7, 8, 9,
                            14, 15, 16, 17, 32, 34, 35, 50, 52, 53}

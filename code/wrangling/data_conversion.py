@@ -57,18 +57,17 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
         resolve_smiles(sol_name, SOLVENT_SMILES, CACHE_FILE)
 
     unique_mol_smiles = list({row[mol_label] for row in valid_rows})
-
     save_sample_pdbs(unique_mol_smiles, out_dir="./data/pdb-molecules", n=10)
-
     SHARD_SIZE = 10000
     shard_files = []
     output_dir = "temp_shards"
     os.makedirs(output_dir, exist_ok=True)
-
     print("QUICK INFO:")
-    print(f"\n Est. total number of shards: {len(unique_mol_smiles)//SHARD_SIZE + 1}")
+    print(
+        f"\n Est. total number of shards: {len(unique_mol_smiles)//SHARD_SIZE + 1}")
     print(f" There are {len(unique_mol_smiles)} to process in total.")
-    print(f" Shard size of {SHARD_SIZE}. Temp shards are located within ./{output_dir}/...")
+    print(
+        f" Shard size of {SHARD_SIZE}. Temp shards are located within ./{output_dir}/...")
     print("-------------------\n")
 
     for i in range(0, len(unique_mol_smiles), SHARD_SIZE):
@@ -112,7 +111,6 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
             pickle.dump(shard_dict, f)
 
         shard_files.append(shard_path)
-
     print("\nCombining all shards into final dictionary...")
     smiles_to_dict = {}
 
@@ -140,8 +138,6 @@ def generate_and_export_data(dataset, mol_label, sol_label, predicted_name, fold
 
     # Export
     print("Uploading data")
-
-    # Fix: Ensure destination folder exists
     os.makedirs(f"./data/{folder}", exist_ok=True)
 
     with open(f"./data/{folder}/{out_file}", "w") as f:
