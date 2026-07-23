@@ -10,19 +10,29 @@ from sklearn.model_selection import train_test_split, KFold
 
 import sys
 import os
+import random
 
 from models.neural_networks import ModelTwo
 from models.goms_sme import Model
 from models.early_stop import EarlyStop
 from models.goms_sme import FragEGNN
+from plotting.plot_loss import plot_loss, plot_error_histogram
 
-from setup.process_data import absorption_data_options, generate_graphs_labels, FragmentDataset, collate_fn
+from setup.process_data import generate_graphs_labels, FragmentDataset, collate_fn, PredOption, has_reasonable_geometry
+
+from rdkit import Chem
 
 # EASY CONTROLS vvv
 n_epochs = 100
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
-re_generate_data = False
+re_generate_data = True
+LEARNING_RATE = 1e-4
+WEIGHT_DECAY = 1e-4
+PATIENCE = 5
+FACTOR = 0.1
+DROPOUT = 0.2
+ERROR_BOUND = 150
 # EASY CONTROLS ^^^
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -30,72 +40,95 @@ sys.path.append(os.path.join(root_dir, 'data-wrangling'))
 sys.path.append(os.path.join(root_dir, 'plots-visuals'))
 
 if __name__ == "__main__":
+    def set_seed(seed=42):
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+            torch.backends.cudnn.deterministic = True
 
-    # D4C
-    molecules_dicts, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(
-        absorption_data_options[0], generate_data=re_generate_data)
+    set_seed(42)
+
+    d4c_absorption = PredOption(
+        "d4c", "Absorption max (nm)", "absorption-data", "absorption-d4c.txt")
+    qmwf_absorption = PredOption(
+        "qmwf", "lambda_max (Exp nm)", "absorption-data", "absorption-qmwf.txt")
+
+    nabla_train = PredOption(
+        "nabla_train", "peakwavs_max", "absorption-data", "abs-nabla-train.txt")
+    nabla_val = PredOption("nabla_val", "peakwavs_max",
+                           "absorption-data", "abs-nabla-val.txt")
+    nabla_test = PredOption("nabla_test", "peakwavs_max",
+                            "absorption-data", "abs-nabla-test.txt")
+
+    # Nabla Colors
+    molecules_dicts_train, y_mean, y_std, train_smiles_for_similarity, train_solv_features = generate_graphs_labels(
+        nabla_train, generate_data=re_generate_data)
+
+    molecules_dicts_val, val_y_mean, val_y_std, val_smiles_for_similarity, val_solv_features = generate_graphs_labels(
+        nabla_train, generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
+
+    molecules_dicts_test, ts_y_mean, ts_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(
+        nabla_train, generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
 
     # External Set
-    ext_dataset, test_y_mean, test_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(
-        absorption_data_options[1], generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
+    ext_dataset, ext_y_mean, ext_y_std, test_smiles_for_similarity, test_solv_features = generate_graphs_labels(
+        qmwf_absorption, generate_data=re_generate_data, y_mean=y_mean, y_std=y_std, normalize=False)
 
-    def has_reasonable_geometry(mol_dict, max_coord=200.0):
-        for frag in mol_dict["frag_graphs"]:
-            if frag.pos.abs().max().item() > max_coord:
-                return False
-        return True
+    ALLOWED_ATOMIC_NUMS = {1, 5, 6, 7, 8, 9,
+                           14, 15, 16, 17, 32, 34, 35, 50, 52, 53}
 
-    before = len(molecules_dicts)
-    molecules_dicts = [
-        d for d in molecules_dicts if has_reasonable_geometry(d)]
-    print(
-        f"Filtered {before - len(molecules_dicts)} molecules with corrupted geometry")
+    datasets = [molecules_dicts_train, molecules_dicts_val,
+                molecules_dicts_test, ext_dataset]
+    labels = ["train", "val", "test", "ext"]
 
-    y_vals = torch.tensor([d["y_normalized"].item() for d in molecules_dicts])
+    for dataset, label in zip(datasets, labels):
+        before = len(dataset)
+        dataset = [d for d in dataset if has_reasonable_geometry(d)]
+        print(
+            f"Filtered {before - len(dataset)} molecules with corrupted geometry from {label} set")
+
+    y_vals = torch.tensor([d["y_normalized"] for d in molecules_dicts_train])
     baseline_mae_normalized = y_vals.abs().mean()
     print(
         f"Baseline (predict mean) normalized MAE: {baseline_mae_normalized:.4f}")
 
-    y_real_vals = torch.tensor([d["y_real"].item() for d in molecules_dicts])
+    y_real_vals = torch.tensor([d["y_real"] for d in molecules_dicts_train])
     baseline_mae_real = (y_real_vals - y_real_vals.mean()).abs().mean()
     print(f"Baseline (predict mean) real-units MAE: {baseline_mae_real:.4f}")
 
-    # Splitting Datasets Randomly (still a list of dictionaries)
-    train_dataset, split_dataset = train_test_split(
-        molecules_dicts, test_size=0.2, random_state=42)
-    val_dataset, test_dataset = train_test_split(
-        split_dataset, test_size=0.5, random_state=42)
-
     # Loaders (returns the list of all fragments, maps, and dicts for later use)
     train_loader = TorchLoader(FragmentDataset(
-        train_dataset), batch_size=64, shuffle=True, collate_fn=collate_fn)
+        molecules_dicts_train), batch_size=64, shuffle=True, collate_fn=collate_fn)
     val_loader = TorchLoader(FragmentDataset(
-        val_dataset), batch_size=128, shuffle=True, collate_fn=collate_fn)
+        molecules_dicts_val), batch_size=128, shuffle=False, collate_fn=collate_fn)
     test_loader = TorchLoader(FragmentDataset(
-        test_dataset), batch_size=128, shuffle=True, collate_fn=collate_fn)
+        molecules_dicts_test), batch_size=128, shuffle=False, collate_fn=collate_fn)
     ext_loader = TorchLoader(FragmentDataset(
-        ext_dataset), batch_size=256, shuffle=True, collate_fn=collate_fn)
+        ext_dataset), batch_size=256, shuffle=False, collate_fn=collate_fn)
 
     # Set up the Model class (GNN/FFNN), AdamW optimizer, and MAE Loss function
-    node_features = molecules_dicts[0]["frag_graphs"][0].num_node_features
-    edge_features = molecules_dicts[0]["frag_graphs"][0].num_edge_features
-    gs_edge_features = molecules_dicts[0]["edge_attr"].shape[1]
+    node_features = molecules_dicts_train[0]["frag_graphs"][0].num_node_features
+    edge_features = molecules_dicts_train[0]["frag_graphs"][0].num_edge_features
+    gs_edge_features = molecules_dicts_train[0]["edge_attr"].shape[1]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model = Model(node_features, edge_features, 64,
-                  gs_edge_features, train_solv_features).to(device)
+                  gs_edge_features, train_solv_features, dropout=DROPOUT).to(device)
     optimizer = torch.optim.AdamW(
-        model.parameters(), lr=0.001, weight_decay=5e-4)
+        model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=5)
-    stopper = EarlyStop(9, 0.005)
+        optimizer, mode='min', factor=FACTOR, patience=PATIENCE)
+    stopper = EarlyStop(10, 0.005)
 
     criterion = torch.nn.L1Loss()
 
     # Train takes in mol & sol loader, zips them to return a forward pass through the model, loss, backprop, repeat
 
-    def train(model, opt, loader):
+    def train(model, opt, loader, log_losses=None):
         model.train()
 
         skipped, total = 0, 0
@@ -118,9 +151,13 @@ if __name__ == "__main__":
                                        data.batch, frags_per_mol, mol_dicts, sol_fp)
 
             y = torch.tensor([d["y_normalized"] for d in mol_dicts],
-                             dtype=torch.float).to(device).unsqueeze(-1)
+                             dtype=torch.float, device=device).view(-1)
+
+            out = out.view(-1)
 
             loss = criterion(out, y)
+            if log_losses is not None:
+                log_losses.append(loss.item())
             total += 1
 
             if not torch.isfinite(loss) or loss.item() > 1e6:
@@ -133,7 +170,7 @@ if __name__ == "__main__":
 
             opt.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
             grads_ok = all(
                 torch.isfinite(p.grad).all()
                 for p in model.parameters() if p.grad is not None
@@ -158,8 +195,11 @@ if __name__ == "__main__":
     def test(model, loader, mean, std, compute_mae=True, is_test_set=False, collect_plot_data=False):
         model.eval()
 
-        total_mae = 0.0
+        norm_total_mae, human_total_mae = 0.0, 0.0
+        signed_total = 0.0
         total_graphs = 0
+        outliers = []
+        massive = []
 
         skipped, total = 0, 0
 
@@ -184,10 +224,12 @@ if __name__ == "__main__":
                     sol_fps, dtype=torch.float, device=device)
                 vector_out, out = model(data.x, data.pos, data.edge_index, data.edge_attr,
                                         data.batch, frags_per_mol, mol_dicts, sol_fp)
-                y = torch.tensor([d["y_normalized"] for d in mol_dicts],
-                                 dtype=torch.float).to(device).unsqueeze(-1)
 
-                loss = criterion(out, y)
+                y = torch.tensor([d["y_normalized"] for d in mol_dicts],
+                                 dtype=torch.float, device=device).view(-1)
+                out = out.view(-1)
+
+                norm_loss = criterion(out, y)
 
                 # Reverse normalization for prediction
                 pred_log = out.squeeze(-1) * std + mean
@@ -196,17 +238,32 @@ if __name__ == "__main__":
                 pred_actual = pred_actual.flatten()
 
                 # Reverse normalization for target too
-                target_actual = torch.tensor([d["y_real"] for d in mol_dicts],
-                                             dtype=torch.float).to(device).unsqueeze(-1)
+                target_actual = torch.tensor(
+                    [d["y_real"] for d in mol_dicts], dtype=torch.float, device=device).view(-1)
 
-                loss = torch.mean(torch.abs(pred_actual - target_actual))
+                loss_tensor = torch.abs(pred_actual - target_actual)
 
-                if not torch.isfinite(loss) or loss.item() > 1e6:
+                human_loss = torch.mean(torch.abs(pred_actual - target_actual))
+
+                if not torch.isfinite(human_loss) or human_loss.item() > 1e6:
                     skipped += 1
                     offending_smiles = [d["smiles"] for d in mol_dicts]
                     print(
-                        f"!!! Skipping eval batch, loss={loss.item()}. Molecules: {offending_smiles}")
+                        f"!!! Skipping eval batch, loss={human_loss.item()}. Molecules: {offending_smiles}")
                     continue  # don't let this batch's inf poison the epoch average
+
+                for d, loss in zip(mol_dicts, loss_tensor.flatten()):
+                    index = int(loss.item()//100)
+                    if len(outliers) < index+1:
+                        while len(outliers) < index+1:
+                            outliers.append(0)
+                    outliers[index] = outliers[index] + 1
+
+                    if loss.item() >= 500:
+                        massive.append(d["smiles"])
+
+                signed_bias = (pred_actual - target_actual).mean()
+                signed_total += (pred_actual - target_actual).sum()
 
                 if collect_plot_data and not is_test_set:
                     train_vectors_for_similarity.extend(vector_out.unbind(0))
@@ -217,36 +274,48 @@ if __name__ == "__main__":
 
                 if compute_mae:
                     num_graphs = data.num_graphs
-                    total_mae += loss * num_graphs
+
+                    norm_total_mae += norm_loss * num_graphs
+                    human_total_mae += human_loss * num_graphs
+
                     total_graphs += num_graphs
             # print(f"  [test] skipped {skipped}/{total} batches")
         if compute_mae:
-            avg_mae = total_mae / total_graphs
+            norm_avg_mae = norm_total_mae / total_graphs
+            human_avg_mae = human_total_mae / total_graphs
+            avg_signed_bias = signed_total / total_graphs
 
-            return avg_mae
+            return norm_avg_mae, human_avg_mae, avg_signed_bias, outliers, massive
         else:
-            return 0.0
+            return 0.0, 0.0, 0.0, [], []
 
     def run_model(model, train_loader, val_loader, opt, sched, stopper):
         # Train & Test the Model
-        with open(f"./data/plot-data/loss.txt", "w") as f_:
+        with open(f"./data/plot-data/nm-loss.txt", "w") as f_, open(f"./data/plot-data/norm-loss.txt", 'w') as f2_:
             for epoch in range(1, n_epochs+1):
                 train(model, opt, train_loader)
 
-                train_avg_mae = test(model, train_loader, y_mean, y_std)
-                val_avg_mae = test(model, val_loader, y_mean, y_std)
-                sched.step(float(val_avg_mae))
+                train_avg_mae_norm, train_avg_mae_human, tr_signed_bias, _, _ = test(
+                    model, train_loader, y_mean, y_std)
+                val_avg_mae_norm, val_avg_mae_human, val_signed_bias, _, _ = test(
+                    model, val_loader, y_mean, y_std)
+                sched.step(float(val_avg_mae_human))
 
-                if stopper.stop_early(val_avg_mae, model):
+                if stopper.stop_early(val_avg_mae_norm, model):
                     print(f'Early stop has been initiated on Epoch #{epoch}')
                     stopper.restore_best(model)
                     break
 
                 print(
-                    f"Epoch #{epoch} | Train Average MAE: {train_avg_mae:.4f} | Test Average MAE: {val_avg_mae:.4f} | Early stopper count: {stopper.count}")
+                    f"Epoch #{epoch} | Train Average MAE (norm): {train_avg_mae_norm:.4f} | Train Average MAE (nm): {train_avg_mae_human:.4f} | Test Average MAE (norm): {val_avg_mae_norm} | Test Average MAE (nm): {val_avg_mae_human:.4f} | Early stopper count: {stopper.count}")
+                # print(f"epoch {epoch}: avg signed bias = {tr_signed_bias:.4f}")
+
                 if (collect_data):
                     # loading data for plotting (train, test)
-                    print(f"{train_avg_mae:.4f}, {val_avg_mae:.4f}", file=f_)
+                    print(
+                        f"{train_avg_mae_human:.4f}, {val_avg_mae_human:.4f}", file=f_)
+                    print(
+                        f"{train_avg_mae_norm:.4f}, {val_avg_mae_norm:.4f}", file=f2_)
 
     run_model(model, train_loader, val_loader, optimizer, scheduler, stopper)
 
@@ -268,10 +337,28 @@ if __name__ == "__main__":
         # print("Visuals not available currently.")
         if (want_visuals == 'y'):
             print("Creating plotting loss visuals \n ...")
-            subprocess.run([sys.executable, "./code/plotting/plot-loss.py"])
+            print(f"NORMALIZATION MEAN: {y_mean} | NORMALIZATION STD: {y_std}")
+            plot_loss("nm-loss", "nm")
+            plot_loss("norm-loss", "norm")
+
+            _, _, _, tr_outliers, tr_massive = test(
+                model, train_loader, y_mean, y_std, compute_mae=True)
+            _, _, _, ts_outliers, ts_massive = test(
+                model, test_loader, y_mean, y_std, compute_mae=True)
+            _, _, _, ex_outliers, ex_massive = test(
+                model, ext_loader, y_mean, y_std, compute_mae=True)
+
+            smiles = ""
+            for s in (tr_massive + ts_massive + ex_massive):
+                smiles = smiles + f"{s}, "
+            print(f"SMILES WITH ERROR ABOVE 10k NM: {smiles}\n")
+
+            plot_error_histogram(tr_outliers, "train")
+            plot_error_histogram(ts_outliers, "test")
+            plot_error_histogram(ex_outliers, "ext")
             print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
 
-        print("Creating plotting loss visuals \n ...")
+        """print("Creating plotting loss visuals \n ...")
         subprocess.run([sys.executable, "./plots-visuals/plot-loss.py"])
         print("Plotting loss sucessfully created!\n Check plots-visuals/new-plots.")
 
@@ -282,4 +369,4 @@ if __name__ == "__main__":
 
         print("Creating scatterplot of the error vs similarity (smiles) \n ...")
         plot_smiles_similarity_loss_graph(
-            train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)
+            train_smiles_for_similarity, test_smiles_for_similarity, test_losses_for_similarity)"""

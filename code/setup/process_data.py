@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 from torch_geometric.data import Batch
 from torch.utils.data import Dataset, DataLoader
+from rdkit import Chem
 
 re_generate_data = False  # use this to toggle whether want to regenerate the data
 
@@ -20,6 +21,9 @@ class PredOption():
             self.sol_label = "Solvent"
         elif (self.dataset == "qmwf"):
             self.mol_label = "SMI"
+            self.sol_label = "solvent"
+        elif ("nabla" in self.dataset):
+            self.mol_label = "smiles"
             self.sol_label = "solvent"
 
         self.pred_label = pred_label
@@ -85,7 +89,7 @@ def generate_graphs_labels(chosen_option, generate_data=False, y_mean=None, y_st
 
     for d, label in zip(molecules_dicts, y_tensor):
         # View(-1,1) returns size [1,1] because y_normalized is a tensor
-        d["y_real"] = label.view(-1, 1)
+        d["y_real"] = label.item()
 
     # Z-Score Standardization to fix Large Data Scale
     y_log = torch.log(y_tensor)
@@ -99,7 +103,7 @@ def generate_graphs_labels(chosen_option, generate_data=False, y_mean=None, y_st
     # Attach the y-labels to the x values
     for d, label in zip(molecules_dicts, y_normalized):
         # View(-1,1) returns size [1,1] because y_normalized is a tensor
-        d["y_normalized"] = label.view(-1, 1)
+        d["y_normalized"] = label.item()
 
     for d, fp in zip(molecules_dicts, solvents_list):
         d["sol_fp"] = fp
@@ -132,3 +136,52 @@ def collate_fn(mol_dicts):
 if re_generate_data:
     for option in absorption_data_options:
         generate_graphs_labels(option, generate_data=True)
+
+
+def is_organic_and_single(mol_dict):
+    ALLOWED_ATOMIC_NUMS = {1, 5, 6, 7, 8, 9,
+                           14, 15, 16, 17, 32, 34, 35, 50, 52, 53}
+
+    smiles = str(mol_dict.get("smiles", "")).strip()
+
+    # 1. Reject multi-component SMILES (e.g. salts containing '.')
+    components = [c for c in smiles.split('.') if c]
+    if len(components) > 1:
+        return False
+
+    # 2. Reject elements outside the allowed list
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return False
+
+    for atom in mol.GetAtoms():
+        if atom.GetAtomicNum() not in ALLOWED_ATOMIC_NUMS:
+            return False
+
+    return True
+
+
+def has_reasonable_geometry(mol_dict, max_coord=200.0, min_atom_dist=0.5):
+    # Check SMILES composition and component count first
+    if not is_organic_and_single(mol_dict):
+        return False
+
+    # Check 3D graph coordinates for physical validity
+    for frag in mol_dict.get("frag_graphs", []):
+        pos = frag.pos
+
+        # Check for NaN or Inf tensor corruption
+        if torch.isnan(pos).any() or torch.isinf(pos).any():
+            return False
+
+        # Check for runaway / blown up coordinates
+        if pos.abs().max().item() > max_coord:
+            return False
+
+        # Check for overlapping atoms (distance near 0) that cause gradient spikes
+        if pos.size(0) > 1:
+            pairwise_dists = torch.pdist(pos)
+            if (pairwise_dists < min_atom_dist).any():
+                return False
+
+    return True

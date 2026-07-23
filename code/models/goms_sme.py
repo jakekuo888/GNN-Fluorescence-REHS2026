@@ -5,7 +5,7 @@ from torch_geometric.utils import to_dense_batch, to_dense_adj
 import numpy as np
 import torch
 import torch.nn as nn
-from torch_geometric.nn import TransformerConv, BatchNorm
+from torch_geometric.nn import TransformerConv, BatchNorm, LayerNorm
 from egnn_pytorch import EGNN as EGNNLayer
 from egnn_pytorch import EGNN_Sparse
 from torch_geometric.data import Data, Batch
@@ -20,7 +20,7 @@ def check_nan(name, tensor):
 
 
 class FragEGNN(nn.Module):
-    def __init__(self, node_features, edge_features, num_layers=3):
+    def __init__(self, node_features, edge_features, num_layers=3, dropout=0.2):
         super().__init__()
 
         self.node_features = node_features
@@ -28,6 +28,7 @@ class FragEGNN(nn.Module):
         # Note these are the dimensions and not the features themselves
 
         self.num_layers = num_layers
+        self.dropout = nn.Dropout(dropout)
 
         self.layers = nn.ModuleList([
             EGNN_Sparse(feats_dim=node_features,
@@ -53,12 +54,14 @@ class FragEGNN(nn.Module):
                 edge_attr=edge_attr
             )
 
-        # 4. Separate the updated node features from the coordinates
-        # The layers maintain the same concatenated structure [coors, feats]
-        feats = x_combined[:, pos_dim:]
-        # (Keep if you need updated positions later)
-        coors = x_combined[:, :pos_dim]
+            # 4. Separate the updated node features from the coordinates
+            # The layers maintain the same concatenated structure [coors, feats]
 
+            coors = x_combined[:, :pos_dim]
+            feats = self.dropout(x_combined[:, pos_dim:])
+            x_combined = torch.cat([coors, feats], dim=-1)
+
+        feats = x_combined[:, pos_dim:]
         # 5. Pool the updated node features across the graph batch
         frag_vectors = global_mean_pool(feats, batch)
 
@@ -75,24 +78,26 @@ class GAT(nn.Module):
         self.num_layers = n_layers
         self.heads = heads
         self.dropout = dropout
+        self.feature_drop = nn.Dropout(dropout)
 
         head_out_dim = self.hidden_channels // self.heads
 
         self.layers = nn.ModuleList()
         self.layers.append(TransformerConv(in_channels=self.in_dim, out_channels=head_out_dim,
                            edge_dim=self.edge_dim, heads=self.heads, dropout=self.dropout))
-        self.layers.append(BatchNorm(self.hidden_channels))
+        self.layers.append(LayerNorm(self.hidden_channels))
 
         for _ in range(n_layers-1):
             self.layers.append(TransformerConv(in_channels=self.hidden_channels, out_channels=head_out_dim,
                                edge_dim=self.edge_dim, heads=self.heads, dropout=self.dropout))
-            self.layers.append(BatchNorm(self.hidden_channels))
+            self.layers.append(LayerNorm(self.hidden_channels))
 
     def forward(self, x, edge_index, edge_attr, batch):
         for layer in self.layers:
-            if isinstance(layer, BatchNorm):
+            if isinstance(layer, LayerNorm):
                 x = layer(x)
                 x = torch.relu(x)
+                x = self.feature_drop(x)
             else:
                 x = layer(x, edge_index, edge_attr)
 
@@ -102,14 +107,14 @@ class GAT(nn.Module):
 
 
 class Model(nn.Module):
-    def __init__(self, node_features, edge_features, hidden_channels, gs_edge_features, solv_features, num_layers=3):
+    def __init__(self, node_features, edge_features, hidden_channels, gs_edge_features, solv_features, num_layers=3, dropout=0.3):
         super().__init__()
 
         self.hidden_channels = hidden_channels
         self.num_layers = num_layers
         self.egnn = FragEGNN(node_features, edge_features, num_layers)
         self.gat = GAT(node_features, gs_edge_features,
-                       hidden_channels, num_layers)
+                       hidden_channels, num_layers, dropout=dropout)
         self.sol_ffnn = FFNN(solv_features, hidden_channels,
                              hidden_sizes=[32, 32])
         self.ffnn = FFNN(2*hidden_channels, 1, [64, 64])
