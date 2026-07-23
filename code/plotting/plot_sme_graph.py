@@ -4,19 +4,17 @@ from rdkit.Chem import AllChem
 from rdkit.Chem import Draw
 from rdkit.Chem.Draw import rdMolDraw2D
 from rdkit import DataStructs
+from PIL import Image, ImageDraw, ImageFont
+
 import numpy as np
-
 import sys
-import matplotlib.pyplot as plt
-
 import json
 import os
-import numpy as np
-import shutil
+import shutil 
 
-n_img_gen = 10
+n_img_gen = 2
 
-print(f"Plot_sme_graph.py is running \n Generating {n_img_gen} images \n ...")
+print(f"Plot_sme_graph.py is running \n Generating {n_img_gen*2} images \n ...")
 
 try:
     with open("./data/plot-data/sme.json", "r") as f:
@@ -88,15 +86,11 @@ FragColors = [
     (0.2, 1.0, 0.5)
 ]
 
-# BRICS families are numbered 1-16, we index FamColor[0] = "no family"
-# (fallback gray) and FamColor[1..16] = actual BRICS types, so the same
-# family number always maps to the same color across every molecule/image.
-FamColor = {0: (0.6, 0.6, 0.6)}  # fallback: fragment with no BRICS boundary
+
+FamColor = {0: (0.6, 0.6, 0.6)}
+
 for i in range(1, 17):
     FamColor[i] = FragColors[i - 1]
-
-print(FamColor)
-
 
 def brics_label_to_family(label):
     # strip trailing letters, e.g. '3a' -> 3, '4b' -> 4
@@ -108,8 +102,6 @@ def brics_label_to_family(label):
 
 
 def fragment_family(labels):
-    # a fragment can border multiple BRICS types if it's bonded to more
-    # than one neighbor fragment -- use the smallest label as representative
     if not labels:
         return 0
     return brics_label_to_family(sorted(labels)[0])
@@ -117,23 +109,100 @@ def fragment_family(labels):
 
 mol_num = 0
 
+print(f"Making {n_img_gen} BRICS images.")
 for mol in data[:n_img_gen]:
     mol_num += 1
     struct = Chem.MolFromSmiles(mol['smiles'])
 
-    drawer = rdMolDraw2D.MolDraw2DCairo(500, 500)
+    drawer = rdMolDraw2D.MolDraw2DCairo(700, 700)
     opts = drawer.drawOptions()
 
     opts.useBWAtomPalette()
 
-    # generate colors by BRICS family instead of by fragment index
+    # generate colors by BRICS family
     HAC = {}
+    Fams = []
     for frag_id_str, fragment in enumerate(mol['atom_groups']):
         labels = mol['frag_brics_types'].get(str(frag_id_str), [])
         fam = fragment_family(labels)
         color = FamColor[fam]
+        Fams.append(fam)
         for atom in fragment:
             HAC[atom] = color
+
+    abs_vals = [abs(n) for n in mol['fragment_removal'].values()]
+    max_val = max(abs_vals) if abs_vals and max(abs_vals) != 0 else 1.0
+
+    radii = {}
+    for key, rm_frag in mol['fragment_removal'].items():
+        scaled_radius = 0.2 + 0.6 * (abs(rm_frag) / max_val)
+        for atom in mol['atom_groups'][int(key)]:
+            radii[atom] = scaled_radius
+
+    drawer.DrawMolecule(
+        struct,
+        highlightAtoms=list(range(struct.GetNumAtoms())),
+        highlightAtomColors=HAC,
+        highlightAtomRadii=radii,
+    )
+    drawer.FinishDrawing()
+    PATH = f'{fpath}M{mol_num}-BRICS-SME.png'
+    with open(PATH, 'wb') as f:
+        f.write(drawer.GetDrawingText())
+
+    img = Image.open(PATH)
+    W, H = img.size
+    left_margin = 200
+    W += left_margin
+    canv_mode = img.mode if img.mode in ("RGB", "RGBA") else "RGB"
+    bg_color = (255, 255, 255, 255) if canv_mode == "RGBA" else (255, 255, 255)
+
+    nImg = Image.new(canv_mode, (W, H), bg_color)
+    nImg.paste(img, (left_margin, 0))
+    draw = ImageDraw.Draw(nImg)
+
+    txtX = 70
+    txtY = 150
+
+    try:
+        font = ImageFont.truetype("./data/inter.ttf", size=24)
+    except IOError:
+        font = ImageFont.load_default()
+
+
+    draw.text((txtX, txtY), "Legend:", fill = (0, 0, 0), font = font)
+
+    for F_ in Fams:
+        NT = tuple(min(int(float(FN)*255), 255) for FN in FamColor[F_])
+        txtY += int(1.6*font.size)
+        l, t, r, b = draw.textbbox((txtX, txtY), f"FTYPE-{F_}", font = font)
+        pad = 6
+        h_box = (l-pad, t - pad, r + pad, b + pad)
+        draw.rectangle(h_box, fill=NT)
+        draw.text((txtX, txtY), f"FTYPE-{F_}", fill = (0, 0, 0), font = font)
+
+    nImg.save(PATH)
+
+
+print(f"Process (1) done \nMaking {n_img_gen} FRAG images.")
+
+mol_num = 0
+for mol in data[:n_img_gen]:
+    mol_num += 1
+    struct = Chem.MolFromSmiles(mol['smiles'])
+
+    drawer = rdMolDraw2D.MolDraw2DCairo(700, 700)
+    opts = drawer.drawOptions()
+
+    opts.useBWAtomPalette()
+
+    #generate fragment colors
+    fragN = 0
+    HAC = {}
+    for fragment in mol['atom_groups']:
+        for atom in fragment:
+            HAC[atom] = FragColors[fragN]
+        fragN += 1
 
     abs_vals = [abs(n) for n in mol['fragment_removal'].values()]
     max_val = max(abs_vals) if abs_vals and max(abs_vals) != 0 else 1.0
@@ -152,5 +221,7 @@ for mol in data[:n_img_gen]:
         highlightAtomRadii=radii,
     )
     drawer.FinishDrawing()
-    with open(f'{fpath}M{mol_num}-SME.png', 'wb') as f:
+    with open(f'{fpath}M{mol_num}-FRAG-SME.png', 'wb') as f:
         f.write(drawer.GetDrawingText())
+
+print("PROCESS DONE")
