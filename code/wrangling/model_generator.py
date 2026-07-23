@@ -421,7 +421,7 @@ def save_sample_pdbs(smiles_list, out_dir="./data/pdb-molecules", n=10):
         except Exception as e:
             continue
 
-        print(f"Saved PDB: {pdb_path}  <-  {smiles}")
+        print(f"Saved NPDB: {pdb_path}  <-  {smiles}")
         saved += 1
 
     print(f"\nSaved {saved}/{n} requested molecules as PDB files to {out_dir}")

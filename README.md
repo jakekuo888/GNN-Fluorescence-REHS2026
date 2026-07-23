@@ -1,15 +1,17 @@
-# GNN-Fluorescence-REHS2026
+# C-FrAG26
 Project for Research Experience for High School 2026 by Krish Nandola and Jake Kuo under the guidance of Dr. Andreas Goetz and Dr. Vikrant Tripathy. In collaboration with San Diego Supercomputing Center, UCSD.
 
 ## Abstract
 
-Determining the absorbance, emission, and lifetime of chromophores in different solvents using machine learning-assisted chemistry. 
+The Maximum Absorption Wavelength ($\lambda_{\text{max}}$) stands out as one of the–if not the–most important molecular properties in guiding selection of molecular compounds in relevant fields. Yet, while state-of-the-art chemical processes and quantum-aware TD-DFT methods exist to calculate $\lambda_{\text{max}}$, their respective costs and expenses deem them infeasible for most large-scale property prediction. Hence, we present C-FrAG26, a machine learning model integrating a solvent-aware Graph Neural Network (GNN) and the contemporary approach to chemical ML of fragmenting molecules into Graphs of Molecular Substructures (GOMS). Furthermore, C-FrAG26 leverages Substructure Mask Explanation (SME) to explain its predictions, culminating in a formidable MAE of ~18 nm across scaffold splits.
 
 ## Frameworks
 
 ### Current Architecture
 
 ![New Architecture](./readme/model_new.jpg)
+
+Pictured is our current model, which operates through five distinct phases. First, using RDKIT’s BRICS function, the program decomposes the relevant molecule into chemical fragments. These fragments are then fed into an EGNN (Equivariant GNN): which transforms the fragment data into condensed vectors. Next, through multiple rounds of message passing, a GNN aggregates these outputs into a single vector representation of the entire molecule. Similarly, the solvent is represented as a vector after being processed by a simple FFNN. Finally, the two vectors are concatenated and fed through another FFNN to produce a property prediction.
 
 The current architecture of the model, based off of Qu, S. and Park, C. (2025) work in GoMS: Graph of Molecular Substructure Network for Molecule Property Prediction.
 
@@ -23,14 +25,18 @@ Dropout of fragments in the molecule, allowing the model to determine the most i
 
 ## Requirements
 - cirpy==1.0.2
+- datamol==0.12.5
 - egnn_pytorch==0.2.8
-- matplotlib==3.11.0
+- matplotlib==3.11.1
 - numpy==2.5.1
-- pandas==3.0.3
+- pandas==3.0.5
+- Pillow==12.3.0
 - rdkit==2026.3.3
 - scikit_learn==1.9.0
 - torch==2.12.1
-- torch_geometric==2.8.0
+- torch_geometric==2.8.0.post1
+- tqdm==4.68.3
+
 
 Quick install requirements with `pip install -r requirements.txt`
 
@@ -44,3 +50,6 @@ Potapov, D., Rogovoi, S., Khrabrov, K., Ushenin, K., Korovin, A., Ber, A., Kadur
 Qu, S. and Park, C. (2025). GoMS: Graph of Molecule Substructure Network for Molecule Property Prediction. [online] arXiv.org. Available at: https://arxiv.org/abs/2512.12489 [Accessed 14 July 2026].
 
 Wu, Z., Wang, J., Du, H., Jiang, D., Kang, Y., Li, D., Pan, P., Deng, Y., Cao, D.S., Hsieh, C.Y. and Hou, T. (2023). Chemistry-intuitive explanation of graph neural networks for molecular property prediction with substructure masking. Nature Communications, 14(1). doi:10.1038/s41467-023-38192-3.
+
+## Acknowledgements
+Michael Sun and Ryan Sharifi for brainstorming the name of the model. 
