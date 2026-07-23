@@ -3,7 +3,8 @@ datamol==0.12.5
 egnn_pytorch==0.2.8
 matplotlib==3.11.1
 numpy==2.5.1
-pandas==3.0.3
+pandas==3.0.5
+Pillow==12.3.0
 rdkit==2026.3.3
 scikit_learn==1.9.0
 torch==2.12.1

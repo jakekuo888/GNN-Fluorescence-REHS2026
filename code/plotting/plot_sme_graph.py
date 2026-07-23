@@ -12,9 +12,7 @@ import json
 import os
 import shutil 
 
-n_img_gen = 2
-
-print(f"Plot_sme_graph.py is running \n Generating {n_img_gen*2} images \n ...")
+n_img_gen = 50
 
 try:
     with open("./data/plot-data/sme.json", "r") as f:
@@ -23,6 +21,13 @@ except Exception as e:
     print("Error retrieving ./data/plot-data/sme.json \n Try running ./code/train_test.py")
     print(f"Full error code: {e}")
     sys.exit(e)
+
+if n_img_gen > len(data):
+    print(f"WARNING: Not enough data points to generate requested '{n_img_gen}' images \n Generating max ({len(data)}) images instead.")
+    n_img_gen = len(data)
+
+print(f"Plot_sme_graph.py is running \n Generating {n_img_gen} (x2) images \n ...")
+
 
 fpath = "./plots-visuals/SME-Graphs/"
 
@@ -34,23 +39,22 @@ os.makedirs(fpath)
 
 
 FragColors = [
-    (1.0, 0.0, 0.0),
-    (0.0, 0.5, 1.0),
-    (0.0, 1.0, 0.2),
-    (1.0, 0.5, 0.0),
-    (0.5, 0.0, 1.0),
-    (1.0, 0.0, 0.7),
-    (0.0, 1.0, 0.9),
-    (1.0, 0.9, 0.0),
-    (0.2, 0.0, 1.0),
-    (0.0, 0.8, 0.5),
-    (1.0, 0.2, 0.5),
-    (0.5, 1.0, 0.0),
-    (0.8, 0.0, 1.0),
-    (0.0, 0.4, 0.8),
-    (0.0, 1.0, 0.6),
-    (1.0, 0.7, 0.0),
-    (0.7, 1.0, 0.0),
+    (1.000, 0.000, 0.000),
+    (0.000, 0.700, 0.000),
+    (0.000, 0.300, 1.000),
+    (1.000, 0.500, 0.000),
+    (0.600, 0.000, 1.000),
+    (0.000, 0.800, 0.800),
+    (1.000, 0.000, 0.700),
+    (0.900, 0.900, 0.000),
+    (0.600, 0.300, 0.000),
+    (0.500, 1.000, 0.000),
+    (0.000, 0.000, 0.500),
+    (0.000, 0.500, 0.500),
+    (1.000, 0.600, 0.800),
+    (0.500, 0.500, 0.000),
+    (0.300, 0.700, 1.000),
+    (0.450, 0.450, 0.450),
     (0.0, 0.6, 1.0),
     (1.0, 0.0, 0.3),
     (0.3, 1.0, 0.0),
@@ -146,11 +150,12 @@ for mol in data[:n_img_gen]:
         highlightAtomRadii=radii,
     )
     drawer.FinishDrawing()
-    PATH = f'{fpath}M{mol_num}-BRICS-SME.png'
+    PATH = f'{fpath}M-{mol_num}-BRICS-SME.png'
     with open(PATH, 'wb') as f:
         f.write(drawer.GetDrawingText())
 
     img = Image.open(PATH)
+    famsAdded = []
     W, H = img.size
     left_margin = 200
     W += left_margin
@@ -162,7 +167,7 @@ for mol in data[:n_img_gen]:
     draw = ImageDraw.Draw(nImg)
 
     txtX = 70
-    txtY = 150
+    txtY = 100
 
     try:
         font = ImageFont.truetype("./data/inter.ttf", size=24)
@@ -173,6 +178,7 @@ for mol in data[:n_img_gen]:
     draw.text((txtX, txtY), "Legend:", fill = (0, 0, 0), font = font)
 
     for F_ in Fams:
+        if(F_ in famsAdded): continue
         NT = tuple(min(int(float(FN)*255), 255) for FN in FamColor[F_])
         txtY += int(1.6*font.size)
         l, t, r, b = draw.textbbox((txtX, txtY), f"FTYPE-{F_}", font = font)
@@ -180,10 +186,11 @@ for mol in data[:n_img_gen]:
         h_box = (l-pad, t - pad, r + pad, b + pad)
         draw.rectangle(h_box, fill=NT)
         draw.text((txtX, txtY), f"FTYPE-{F_}", fill = (0, 0, 0), font = font)
+        famsAdded.append(F_)
 
     nImg.save(PATH)
 
-
+"""
 print(f"Process (1) done \nMaking {n_img_gen} FRAG images.")
 
 mol_num = 0
@@ -221,7 +228,8 @@ for mol in data[:n_img_gen]:
         highlightAtomRadii=radii,
     )
     drawer.FinishDrawing()
-    with open(f'{fpath}M{mol_num}-FRAG-SME.png', 'wb') as f:
+    with open(f'{fpath}M-{mol_num}-FRAG-SME.png', 'wb') as f:
         f.write(drawer.GetDrawingText())
 
 print("PROCESS DONE")
+"""
