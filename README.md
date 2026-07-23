@@ -1,4 +1,13 @@
 # C-FrAG26
+```
+   ______     ______     ___   _________   _____
+  / ____/    / ____/____/   | / ____/__ \ / ___/
+ / /  ______/ /_  / ___/ /| |/ / __ __/ // __ \ 
+/ /__/_____/ __/ / /  / ___ / /_/ // __// /_/ / 
+\____/    /_/   /_/  /_/  |_\____//____/\____/  
+
+```
+
 Project for Research Experience for High School 2026 by Krish Nandola and Jake Kuo under the guidance of Dr. Andreas Goetz and Dr. Vikrant Tripathy. In collaboration with San Diego Supercomputing Center, UCSD.
 
 ## Abstract
