@@ -364,7 +364,7 @@ if __name__ == "__main__":
             sol_fps = np.array([d['sol_fp'] for d in mol_dicts])
             sol_fp = torch.tensor(sol_fps, dtype=torch.float, device=device)
             batch_attrs = sme_attribution(
-                model, data, frags_per_mol, mol_dicts, sol_fp, device, combo_search=True)
+                model, data, frags_per_mol, mol_dicts, sol_fp, device)
 
             for mol_dict, attrs in zip(mol_dicts, batch_attrs):
                 smiles = mol_dict["smiles"]
@@ -391,10 +391,6 @@ if __name__ == "__main__":
                     "fragment_removal": fragment_removal,
                     "frag_brics_types": brics_types,
                 }
-
-                if "combinations" in attrs:
-                    record["combinations"] = {
-                        str(k): v for k, v in attrs["combinations"].items()}
 
                 all_attr.append(record)
 

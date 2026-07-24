@@ -20,7 +20,7 @@ def sme_pool(x, batch, num_mols, mask = None):
 
 
 @torch.no_grad()
-def sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, max_combinations=100, combo_search=False):
+def sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, max_combinations=100):
     model.eval()
 
     # ---- 1. Atom -> fragment embeddings (unmasked, run once) ----
@@ -75,31 +75,6 @@ def sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, max_c
             Y_masked = model.ffnn(torch.cat([mol_readout_masked, solv_readout], dim=-1))
 
             attributions[local_i] = (Y_full[mol_idx] - Y_masked[mol_idx]).item()
-
-        # Optional: paper's "combination" compensation strategy for
-        # molecules where individually-masked fragments underestimate
-        # attribution because other toxic/active fragments remain.
-        if combo_search and k > 1:
-            combos = []
-            n_combos = min(max_combinations, 2 ** k - 1)
-            seen = set()
-            while len(combos) < n_combos:
-                size = random.randint(1, k)
-                combo = tuple(sorted(random.sample(range(k), size)))
-                if combo not in seen:
-                    seen.add(combo)
-                    combos.append(combo)
-
-            combo_attributions = {}
-            for combo in combos:
-                mask = torch.ones(x.size(0), device=device)
-                for local_i in combo:
-                    mask[global_frag_ids[local_i]] = 0.0
-                mol_readout_masked = sme_pool(x, gs_batch.batch, num_mols, mask)
-                Y_masked = model.ffnn(torch.cat([mol_readout_masked, solv_readout], dim=-1))
-                combo_attributions[combo] = (Y_full[mol_idx] - Y_masked[mol_idx]).item()
-
-            attributions["combinations"] = combo_attributions
 
         results.append(attributions)
         frag_offset += k

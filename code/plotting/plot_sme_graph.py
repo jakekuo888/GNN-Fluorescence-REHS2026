@@ -114,7 +114,7 @@ def fragment_family(labels):
 mol_num = 0
 
 print(f"Making {n_img_gen} BRICS images.")
-for mol in data[:n_img_gen]:
+for mol in data[100:n_img_gen+100]:
     mol_num += 1
     struct = Chem.MolFromSmiles(mol['smiles'])
 
