@@ -2,6 +2,7 @@ import torch
 import random
 from torch_geometric.nn import BatchNorm
 from torch_geometric.data import Data, Batch
+from torch_geometric.nn import LayerNorm
 
 def sme_pool(x, batch, num_mols, mask = None):
 	#Make sure to skip molecules with only one fragment total
@@ -38,11 +39,15 @@ def sme_attribution(model, data, frags_per_mol, mol_dicts, sol_fp, device, max_c
     gs_batch = Batch.from_data_list(goms).to(device)
 
     # ---- 2. Fragment-level message passing (unmasked, run once) ----
+    # NOTE: this mirrors GAT.forward's layer loop by hand so we can
+    # intercept before pooling. If GAT.forward changes (new norm type,
+    # new activation, new dropout, etc.), this loop must be updated to match.
     x = gs_batch.x
     for layer in model.gat.layers:
-        if isinstance(layer, BatchNorm):
+        if isinstance(layer, LayerNorm):
             x = layer(x)
             x = torch.relu(x)
+            x = model.gat.feature_drop(x)
         else:
             x = layer(x, gs_batch.edge_index, gs_batch.edge_attr)
     # x == h_v for every fragment, frozen for all subsequent masks

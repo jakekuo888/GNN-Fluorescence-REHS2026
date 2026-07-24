@@ -29,7 +29,7 @@ from rdkit import Chem
 n_epochs = 1
 collect_data = True
 early_stopper = EarlyStop(9, 0.005)
-re_generate_data = True
+re_generate_data = False
 LEARNING_RATE = 1e-4
 WEIGHT_DECAY = 1e-4
 PATIENCE = 5
